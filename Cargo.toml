@@ -12,3 +12,20 @@ members = [
 
 [dependencies]
 reem-api = { path = "api/", version = "0.1.0"}
+anyhow = "1.0"
+crossbeam-channel = "0.4"
+chrono = "0.4"
+chrono-tz = "0.5"
+dirs-next = "2.0.0"
+itertools = "0.9"
+lazy_static = "1.4"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.8"
+structopt = "0.3"
+
+async-std = "1.5"
+futures = "0.3"
+
+better-panic = "0.2"
+crossterm = "0.19"
+tui = { version = "0.14", default-features = false, features = ["crossterm","serde"] }
