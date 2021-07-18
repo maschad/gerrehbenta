@@ -1,231 +1,176 @@
-extern crate reem_api as api;
+use crossterm::{
+    event::{self, Event as CEvent, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
-use std::{io, panic, thread};
 
-use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
-use crossterm::event::{Event, MouseEvent, MouseEventKind};
-use crossterm::{cursor, execute, terminal};
-use lazy_static::lazy_static;
-use service::default_timestamps::DefaultTimestampService;
-use tui::backend::CrosstermBackend;
-use tui::Terminal;
+use std::io;
+use std::sync::mpsc;
+use std::thread;
+use std::time::{Duration, Instant};
 
-use crate::app::DebugInfo;
-use crate::common::{ChartType, TimeFrame};
+use tui::{
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction, Layout},
+    style::{Color, Modifier, Style},
+    text::{Span, Spans},
+    widgets::{
+        Block, BorderType, Borders, ListState, Paragraph,Tabs,
+    },
+    Terminal,
+};
 
-mod app;
-mod common;
-mod draw;
-mod event;
-mod opts;
-mod service;
-mod task;
-mod theme;
-mod widget;
+mod widgets;
 
-lazy_static! {
-    static ref CLIENT: api::Client = api::Client::new();
-    static ref DEBUG_LEVEL: app::EnvConfig = app::EnvConfig::load();
-    pub static ref OPTS: opts::Opts = opts::resolve_opts();
-    pub static ref UPDATE_INTERVAL: u64 = OPTS.update_interval.unwrap_or(1);
-    pub static ref TIME_FRAME: TimeFrame = OPTS.time_frame.unwrap_or(TimeFrame::Day1);
-    pub static ref HIDE_TOGGLE: bool = OPTS.hide_toggle;
-    pub static ref HIDE_PREV_CLOSE: bool = OPTS.hide_prev_close;
-    pub static ref REDRAW_REQUEST: (Sender<()>, Receiver<()>) = bounded(1);
-    pub static ref DATA_RECEIVED: (Sender<()>, Receiver<()>) = bounded(1);
-    pub static ref SHOW_X_LABELS: RwLock<bool> = RwLock::new(OPTS.show_x_labels);
-    pub static ref ENABLE_PRE_POST: RwLock<bool> = RwLock::new(OPTS.enable_pre_post);
-    pub static ref TRUNC_PRE: bool = OPTS.trunc_pre;
-    pub static ref SHOW_VOLUMES: RwLock<bool> = RwLock::new(OPTS.show_volumes);
-    pub static ref DEFAULT_TIMESTAMPS: RwLock<HashMap<TimeFrame, Vec<i64>>> = Default::default();
-    pub static ref THEME: theme::Theme = OPTS.theme.unwrap_or_default();
-}
+use crate::widgets::menu::{Event, MenuItem};
+use crate::widgets::menu::render_home;
 
-fn main() {
-    better_panic::install();
 
-    let opts = OPTS.clone();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    enable_raw_mode().expect("can run in raw mode");
 
-    let backend = CrosstermBackend::new(io::stdout());
-    let mut terminal = Terminal::new(backend).unwrap();
-
-    setup_panic_hook();
-    setup_terminal();
-
-    let request_redraw = REDRAW_REQUEST.0.clone();
-    let data_received = DATA_RECEIVED.1.clone();
-    let ui_events = setup_ui_events();
-
-    let starting_chart_type = opts.chart_type.unwrap_or(ChartType::Line);
-
-    let starting_tokens: Vec<_> = opts
-        .symbols
-        .unwrap_or_default()
-        .into_iter()
-        .map(|symbol| widget::StockState::new(symbol, starting_chart_type))
-        .collect();
-
-    let starting_mode = if starting_stocks.is_empty() {
-        app::Mode::AddStock
-    } else if opts.summary {
-        app::Mode::DisplaySummary
-    } else {
-        app::Mode::DisplayStock
-    };
-
-    let default_timestamp_service = DefaultTimestampService::new();
-
-    let app = Arc::new(Mutex::new(app::App {
-        mode: starting_mode,
-        tokens: starting_tokens,
-        add_token: widget::AddTokenState::new(),
-        help: widget::HelpWidget {},
-        current_tab: 0,
-        hide_help: opts.hide_help,
-        debug: DebugInfo {
-            enabled: DEBUG_LEVEL.show_debug,
-            dimensions: (0, 0),
-            cursor_location: None,
-            last_event: None,
-            mode: starting_mode,
-        },
-        previous_mode: if opts.summary {
-            app::Mode::DisplaySummary
-        } else {
-            app::Mode::DisplayStock
-        },
-        summary_time_frame: opts.time_frame.unwrap_or(TimeFrame::Day1),
-        default_timestamp_service,
-        summary_scroll_state: Default::default(),
-        chart_type: starting_chart_type,
-    }));
-
-    let move_app = app.clone();
-
-    // Redraw thread
+    let (tx, rx) = mpsc::channel();
+    let tick_rate = Duration::from_millis(200);
     thread::spawn(move || {
-        let app = move_app;
-
-        let redraw_requested = REDRAW_REQUEST.1.clone();
-
+        let mut last_tick = Instant::now();
         loop {
-            select! {
-                recv(redraw_requested) -> _ => {
-                    let mut app = app.lock().unwrap();
+            let timeout = tick_rate
+                .checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
 
-                    draw::draw(&mut terminal, &mut app);
+            if event::poll(timeout).expect("poll works") {
+                if let CEvent::Key(key) = event::read().expect("can read events") {
+                    tx.send(Event::Input(key)).expect("can send events");
                 }
-                // Default redraw on every duration
-                default(Duration::from_millis(500)) => {
-                    let mut app = app.lock().unwrap();
+            }
 
-                    // Drive animation of loading icon
-                    for stock in app.stocks.iter_mut() {
-                        stock.loading_tick();
-                    }
-
-                    draw::draw(&mut terminal, &mut app);
+            if last_tick.elapsed() >= tick_rate {
+                if let Ok(_) = tx.send(Event::Tick) {
+                    last_tick = Instant::now();
                 }
             }
         }
     });
+
+    let stdout = io::stdout();
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
+
+    let menu_titles = vec!["Home", "Pets", "Add", "Delete", "Quit"];
+    let mut active_menu_item = MenuItem::Home;
+    let mut pet_list_state = ListState::default();
+    pet_list_state.select(Some(0));
 
     loop {
-        select! {
-            // Notified that new data has been fetched from API, update widgets
-            // so they can update their state with this new information
-            recv(data_received) -> _ => {
-                let mut app = app.lock().unwrap();
+        terminal.draw(|rect| {
+            let size = rect.size();
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .margin(2)
+                .constraints(
+                    [
+                        Constraint::Length(3),
+                        Constraint::Min(2),
+                        Constraint::Length(3),
+                    ]
+                    .as_ref(),
+                )
+                .split(size);
 
-                app.update();
+            let copyright = Paragraph::new("pet-CLI 2020 - all rights reserved")
+                .style(Style::default().fg(Color::LightCyan))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .style(Style::default().fg(Color::White))
+                        .title("Copyright")
+                        .border_type(BorderType::Plain),
+                );
 
-                for stock in app.stocks.iter_mut() {
-                    stock.update();
+            let menu = menu_titles
+                .iter()
+                .map(|t| {
+                    let (first, rest) = t.split_at(1);
+                    Spans::from(vec![
+                        Span::styled(
+                            first,
+                            Style::default()
+                                .fg(Color::Yellow)
+                                .add_modifier(Modifier::UNDERLINED),
+                        ),
+                        Span::styled(rest, Style::default().fg(Color::White)),
+                    ])
+                })
+                .collect();
 
-                    if let Some(options) = stock.options.as_mut() {
-                        options.update();
-                    }
+            let tabs = Tabs::new(menu)
+                .select(active_menu_item.into())
+                .block(Block::default().title("Menu").borders(Borders::ALL))
+                .style(Style::default().fg(Color::White))
+                .highlight_style(Style::default().fg(Color::Yellow))
+                .divider(Span::raw("|"));
+
+            rect.render_widget(tabs, chunks[0]);
+            match active_menu_item {
+                MenuItem::Home => rect.render_widget(render_home(), chunks[1]),
+                MenuItem::Pets => {
+                    let pets_chunks = Layout::default()
+                        .direction(Direction::Horizontal)
+                        .constraints(
+                            [Constraint::Percentage(20), Constraint::Percentage(80)].as_ref(),
+                        )
+                        .split(chunks[1]);
+                    let (left, right) = render_pets(&pet_list_state);
+                    rect.render_stateful_widget(left, pets_chunks[0], &mut pet_list_state);
+                    rect.render_widget(right, pets_chunks[1]);
                 }
             }
-            recv(ui_events) -> message => {
-                let mut app = app.lock().unwrap();
+            rect.render_widget(copyright, chunks[2]);
+        })?;
 
-                if app.debug.enabled {
-                    if let Ok(event) = message {
-                        app.debug.last_event = Some(event);
-                    }
+        match rx.recv()? {
+            Event::Input(event) => match event.code {
+                KeyCode::Char('q') => {
+                    disable_raw_mode()?;
+                    terminal.show_cursor()?;
+                    break;
                 }
-
-                match message {
-                    Ok(Event::Key(key_event)) => {
-                        event::handle_key_bindings(app.mode, key_event, &mut app, &request_redraw);
-                    }
-                    Ok(Event::Mouse(MouseEvent { kind, row, column,.. })) => {
-                        if app.debug.enabled {
-                            match kind {
-                                MouseEventKind::Down(_) => app.debug.cursor_location = Some((row, column)),
-                                MouseEventKind::Up(_) => app.debug.cursor_location = Some((row, column)),
-                                MouseEventKind::Drag(_) => app.debug.cursor_location = Some((row, column)),
-                                _ => {}
-                            }
+                KeyCode::Char('h') => active_menu_item = MenuItem::Home,
+                KeyCode::Char('p') => active_menu_item = MenuItem::Pets,
+                KeyCode::Char('a') => {
+                    add_random_pet_to_db().expect("can add new random pet");
+                }
+                KeyCode::Char('d') => {
+                    remove_pet_at_index(&mut pet_list_state).expect("can remove pet");
+                }
+                KeyCode::Down => {
+                    if let Some(selected) = pet_list_state.selected() {
+                        let amount_pets = read_db().expect("can fetch pet list").len();
+                        if selected >= amount_pets - 1 {
+                            pet_list_state.select(Some(0));
+                        } else {
+                            pet_list_state.select(Some(selected + 1));
                         }
                     }
-                    Ok(Event::Resize(..)) => {
-                        let _ = request_redraw.try_send(());
-                    }
-                    _ => {}
                 }
-            }
+                KeyCode::Up => {
+                    if let Some(selected) = pet_list_state.selected() {
+                        let amount_pets = read_db().expect("can fetch pet list").len();
+                        if selected > 0 {
+                            pet_list_state.select(Some(selected - 1));
+                        } else {
+                            pet_list_state.select(Some(amount_pets - 1));
+                        }
+                    }
+                }
+                _ => {}
+            },
+            Event::Tick => {}
         }
     }
+
+    Ok(())
 }
 
-fn setup_terminal() {
-    let mut stdout = io::stdout();
-
-    execute!(stdout, cursor::Hide).unwrap();
-    execute!(stdout, terminal::EnterAlternateScreen).unwrap();
-
-    execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
-
-    if DEBUG_LEVEL.debug_mouse {
-        execute!(stdout, crossterm::event::EnableMouseCapture).unwrap();
-    }
-
-    terminal::enable_raw_mode().unwrap();
-}
-
-fn cleanup_terminal() {
-    let mut stdout = io::stdout();
-
-    if DEBUG_LEVEL.debug_mouse {
-        execute!(stdout, crossterm::event::DisableMouseCapture).unwrap();
-    }
-
-    execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
-    execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
-
-    execute!(stdout, terminal::LeaveAlternateScreen).unwrap();
-    execute!(stdout, cursor::Show).unwrap();
-
-    terminal::disable_raw_mode().unwrap();
-}
-
-fn setup_ui_events() -> Receiver<Event> {
-    let (sender, receiver) = unbounded();
-    std::thread::spawn(move || loop {
-        sender.send(crossterm::event::read().unwrap()).unwrap();
-    });
-
-    receiver
-}
-
-fn setup_panic_hook() {
-    panic::set_hook(Box::new(|panic_info| {
-        cleanup_terminal();
-        better_panic::Settings::auto().create_panic_handler()(panic_info);
-    }));
-}
