@@ -1,32 +1,97 @@
-use crossterm::{
-    event::{self, Event as CEvent, KeyCode},
-    terminal::{disable_raw_mode, enable_raw_mode},
-};
+mod util;
 
+use tui::widgets::Cell;
+use tui::widgets::Row;
+use tui::widgets::Table;
+use tui::widgets::TableState;
+use crate::util::event::Event;
 
 use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
+use std::{error::Error};
+
+
+use crossterm::{
+    event::{self, Event as CEvent, KeyCode},
+    terminal::{disable_raw_mode, enable_raw_mode},
+};
 
 use tui::{
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Spans},
-    widgets::{
-        Block, BorderType, Borders, ListState, Paragraph,Tabs,
-    },
+    text::Span,
+    widgets::{Block, BorderType, Borders},
     Terminal,
 };
 
-mod widgets;
+pub struct StatefulTable<'a> {
+    state: TableState,
+    items: Vec<Vec<&'a str>>,
+}
 
-use crate::widgets::menu::{Event, MenuItem};
-use crate::widgets::menu::render_home;
+impl<'a> StatefulTable<'a> {
+    fn new() -> StatefulTable<'a> {
+        StatefulTable {
+            state: TableState::default(),
+            items: vec![
+                vec!["Row11", "Row12", "Row13"],
+                vec!["Row21", "Row22", "Row23"],
+                vec!["Row31", "Row32", "Row33"],
+                vec!["Row41", "Row42", "Row43"],
+                vec!["Row51", "Row52", "Row53"],
+                vec!["Row61", "Row62\nTest", "Row63"],
+                vec!["Row71", "Row72", "Row73"],
+                vec!["Row81", "Row82", "Row83"],
+                vec!["Row91", "Row92", "Row93"],
+                vec!["Row101", "Row102", "Row103"],
+                vec!["Row111", "Row112", "Row113"],
+                vec!["Row121", "Row122", "Row123"],
+                vec!["Row131", "Row132", "Row133"],
+                vec!["Row141", "Row142", "Row143"],
+                vec!["Row151", "Row152", "Row153"],
+                vec!["Row161", "Row162", "Row163"],
+                vec!["Row171", "Row172", "Row173"],
+                vec!["Row181", "Row182", "Row183"],
+                vec!["Row191", "Row192", "Row193"],
+            ],
+        }
+    }
+    pub fn next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.items.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    pub fn previous(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.items.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+}
 
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+fn main() -> Result<(), Box<dyn Error>> {
+
     enable_raw_mode().expect("can run in raw mode");
 
     let (tx, rx) = mpsc::channel();
@@ -55,79 +120,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    let mut table = StatefulTable::new();
+
     terminal.clear()?;
 
-    let menu_titles = vec!["Home", "Pets", "Add", "Delete", "Quit"];
-    let mut active_menu_item = MenuItem::Home;
-    let mut pet_list_state = ListState::default();
-    pet_list_state.select(Some(0));
-
     loop {
-        terminal.draw(|rect| {
-            let size = rect.size();
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .margin(2)
-                .constraints(
-                    [
-                        Constraint::Length(3),
-                        Constraint::Min(2),
-                        Constraint::Length(3),
-                    ]
-                    .as_ref(),
-                )
-                .split(size);
+        terminal.draw(|f| {
+            // Wrapping block for a group
+            // Just draw the block and the group on the same area and build the group
+            // with at least a margin of 1
+            let size = f.size();
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title("Top Tokens")
+                .border_type(BorderType::Thick);
+            f.render_widget(block, size);
 
-            let copyright = Paragraph::new("pet-CLI 2020 - all rights reserved")
-                .style(Style::default().fg(Color::LightCyan))
-                .alignment(Alignment::Center)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .style(Style::default().fg(Color::White))
-                        .title("Copyright")
-                        .border_type(BorderType::Plain),
-                );
+            let rects = Layout::default()
+                .constraints([Constraint::Percentage(100)].as_ref())
+                .margin(5)
+                .split(f.size());
 
-            let menu = menu_titles
+            let selected_style = Style::default().add_modifier(Modifier::REVERSED);
+            let normal_style = Style::default().bg(Color::Blue);
+            let header_cells = ["Name", "Price", "Volume"]
                 .iter()
-                .map(|t| {
-                    let (first, rest) = t.split_at(1);
-                    Spans::from(vec![
-                        Span::styled(
-                            first,
-                            Style::default()
-                                .fg(Color::Yellow)
-                                .add_modifier(Modifier::UNDERLINED),
-                        ),
-                        Span::styled(rest, Style::default().fg(Color::White)),
-                    ])
-                })
-                .collect();
-
-            let tabs = Tabs::new(menu)
-                .select(active_menu_item.into())
-                .block(Block::default().title("Menu").borders(Borders::ALL))
-                .style(Style::default().fg(Color::White))
-                .highlight_style(Style::default().fg(Color::Yellow))
-                .divider(Span::raw("|"));
-
-            rect.render_widget(tabs, chunks[0]);
-            match active_menu_item {
-                MenuItem::Home => rect.render_widget(render_home(), chunks[1]),
-                MenuItem::Pets => {
-                    let pets_chunks = Layout::default()
-                        .direction(Direction::Horizontal)
-                        .constraints(
-                            [Constraint::Percentage(20), Constraint::Percentage(80)].as_ref(),
-                        )
-                        .split(chunks[1]);
-                    let (left, right) = render_pets(&pet_list_state);
-                    rect.render_stateful_widget(left, pets_chunks[0], &mut pet_list_state);
-                    rect.render_widget(right, pets_chunks[1]);
-                }
-            }
-            rect.render_widget(copyright, chunks[2]);
+                .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
+            let header = Row::new(header_cells)
+                .style(normal_style)
+                .height(1)
+                .bottom_margin(1);
+            let rows = table.items.iter().map(|item| {
+                let height = item
+                    .iter()
+                    .map(|content| content.chars().filter(|c| *c == '\n').count())
+                    .max()
+                    .unwrap_or(0)
+                    + 1;
+                let cells = item.iter().map(|c| Cell::from(*c));
+                Row::new(cells).height(height as u16).bottom_margin(1)
+            });
+            let t = Table::new(rows)
+                .header(header)
+                .highlight_style(selected_style)
+                .highlight_symbol(">> ")
+                .widths(&[
+                    Constraint::Percentage(50),
+                    Constraint::Length(30),
+                    Constraint::Max(10),
+                ]);
+            f.render_stateful_widget(t, rects[0], &mut table.state);
         })?;
 
         match rx.recv()? {
@@ -137,40 +180,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     terminal.show_cursor()?;
                     break;
                 }
-                KeyCode::Char('h') => active_menu_item = MenuItem::Home,
-                KeyCode::Char('p') => active_menu_item = MenuItem::Pets,
-                KeyCode::Char('a') => {
-                    add_random_pet_to_db().expect("can add new random pet");
-                }
-                KeyCode::Char('d') => {
-                    remove_pet_at_index(&mut pet_list_state).expect("can remove pet");
-                }
                 KeyCode::Down => {
-                    if let Some(selected) = pet_list_state.selected() {
-                        let amount_pets = read_db().expect("can fetch pet list").len();
-                        if selected >= amount_pets - 1 {
-                            pet_list_state.select(Some(0));
-                        } else {
-                            pet_list_state.select(Some(selected + 1));
-                        }
-                    }
+                    table.next();
                 }
                 KeyCode::Up => {
-                    if let Some(selected) = pet_list_state.selected() {
-                        let amount_pets = read_db().expect("can fetch pet list").len();
-                        if selected > 0 {
-                            pet_list_state.select(Some(selected - 1));
-                        } else {
-                            pet_list_state.select(Some(amount_pets - 1));
-                        }
-                    }
+                    table.previous();
                 }
                 _ => {}
             },
             Event::Tick => {}
         }
     }
-
     Ok(())
 }
-
