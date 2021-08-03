@@ -1,9 +1,7 @@
 mod util;
 
-use tui::widgets::Cell;
-use tui::widgets::Row;
-use tui::widgets::Table;
-use tui::widgets::TableState;
+use crate::util::event::SinSignal;
+
 use crate::util::event::Event;
 
 use std::io;
@@ -23,7 +21,8 @@ use tui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::Span,
-    widgets::{Block, BorderType, Borders},
+    widgets::{Axis,Block, BorderType, Borders, Cell, Chart, Dataset, Row, Table, TableState},
+    symbols,
     Terminal,
 };
 
@@ -37,25 +36,11 @@ impl<'a> StatefulTable<'a> {
         StatefulTable {
             state: TableState::default(),
             items: vec![
-                vec!["Row11", "Row12", "Row13"],
-                vec!["Row21", "Row22", "Row23"],
-                vec!["Row31", "Row32", "Row33"],
-                vec!["Row41", "Row42", "Row43"],
-                vec!["Row51", "Row52", "Row53"],
-                vec!["Row61", "Row62\nTest", "Row63"],
-                vec!["Row71", "Row72", "Row73"],
-                vec!["Row81", "Row82", "Row83"],
-                vec!["Row91", "Row92", "Row93"],
-                vec!["Row101", "Row102", "Row103"],
-                vec!["Row111", "Row112", "Row113"],
-                vec!["Row121", "Row122", "Row123"],
-                vec!["Row131", "Row132", "Row133"],
-                vec!["Row141", "Row142", "Row143"],
-                vec!["Row151", "Row152", "Row153"],
-                vec!["Row161", "Row162", "Row163"],
-                vec!["Row171", "Row172", "Row173"],
-                vec!["Row181", "Row182", "Row183"],
-                vec!["Row191", "Row192", "Row193"],
+                vec!["ETH", "$2,400", "-0.08%"],
+                vec!["USDC", "$1.01", "-0.02%"],
+                vec!["BTC", "$40,000", "+20.54%"],
+                vec!["UNI", "$21.30", "+10.00%"],
+                vec!["DAI", "$1.00", "0.00%"],
             ],
         }
     }
@@ -88,6 +73,38 @@ impl<'a> StatefulTable<'a> {
     }
 }
 
+
+struct TokenChart {
+    signal: SinSignal,
+    data: Vec<(f64, f64)>,
+    window: [f64; 2],
+}
+
+
+impl TokenChart {
+
+    fn new() -> TokenChart {
+        let mut signal = SinSignal::new(0.2, 3.0, 18.0);
+
+        let data = signal.by_ref().take(200).collect::<Vec<(f64, f64)>>();
+
+        TokenChart {
+            signal,
+            data,
+            window: [0.0, 20.0],
+        }
+    }
+
+    fn update(&mut self) {
+
+        for _ in 0..10 {
+            self.data.remove(0);
+        }
+        self.data.extend(self.signal.by_ref().take(5));
+        self.window[0] += 1.0;
+        self.window[1] += 1.0
+    }
+}
 
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -123,6 +140,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut table = StatefulTable::new();
 
+    let mut token_chart = TokenChart::new();
+
     terminal.clear()?;
 
     loop {
@@ -131,12 +150,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Just draw the block and the group on the same area and build the group
             // with at least a margin of 1
             let size = f.size();
+
             let block = Block::default()
                 .borders(Borders::ALL)
                 .title("Top Tokens")
                 .border_type(BorderType::Thick);
             f.render_widget(block, size);
 
+
+            // Table Layout
             let rects = Layout::default()
                 .constraints([Constraint::Percentage(100)].as_ref())
                 .margin(5)
@@ -161,6 +183,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let cells = item.iter().map(|c| Cell::from(*c));
                 Row::new(cells).height(height as u16).bottom_margin(1)
             });
+
+            // Stateful Table for tokens
             let t = Table::new(rows)
                 .header(header)
                 .highlight_style(selected_style)
@@ -171,6 +195,69 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Constraint::Max(10),
                 ]);
             f.render_stateful_widget(t, rects[0], &mut table.state);
+
+            // Line Graph for selected token
+            let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(
+                [
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                    Constraint::Ratio(1, 3),
+                ]
+                .as_ref(),
+            )
+            .split(size);
+
+            let x_labels = vec![
+                Span::styled(
+                    format!("{}", token_chart.window[0]),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(format!("{}", (token_chart.window[0] + token_chart.window[1]) / 2.0)),
+                Span::styled(
+                    format!("{}", token_chart.window[1]),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+            ];
+
+            let dataset = vec![Dataset::default()
+                    .name("data")
+                    .marker(symbols::Marker::Dot)
+                    .style(Style::default().fg(Color::Cyan))
+                    .data(&token_chart.data)];
+
+            let chart = Chart::new(dataset)
+            .block(
+                Block::default()
+                .title(Span::styled(
+                    "Price"
+                ,
+                Style::default().fg(Color::LightCyan).add_modifier(Modifier::BOLD),
+                ))
+                .borders(Borders::ALL)
+            )
+            .x_axis(
+                Axis::default()
+                        .title("X Axis")
+                        .style(Style::default().fg(Color::Gray))
+                        .labels(x_labels)
+                        .bounds(token_chart.window),
+                )
+                .y_axis(
+                    Axis::default()
+                        .title("Y Axis")
+                        .style(Style::default().fg(Color::Gray))
+                        .labels(vec![
+                            Span::styled("-20", Style::default().add_modifier(Modifier::BOLD)),
+                            Span::raw("0"),
+                            Span::styled("20", Style::default().add_modifier(Modifier::BOLD)),
+                        ])
+                        .bounds([-20.0, 20.0]),
+                );
+
+            f.render_widget(chart, chunks[0]);
+
         })?;
 
         match rx.recv()? {
@@ -188,7 +275,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 _ => {}
             },
-            Event::Tick => {}
+            Event::Tick => {
+                token_chart.update();
+            }
         }
     }
     Ok(())
