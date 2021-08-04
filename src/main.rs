@@ -84,7 +84,7 @@ struct TokenChart {
 impl TokenChart {
 
     fn new() -> TokenChart {
-        let mut signal = SinSignal::new(0.2, 3.0, 18.0);
+        let mut signal = SinSignal::new(0.1, 2.0, 20.0);
 
         let data = signal.by_ref().take(200).collect::<Vec<(f64, f64)>>();
 
@@ -96,13 +96,12 @@ impl TokenChart {
     }
 
     fn update(&mut self) {
-
         for _ in 0..10 {
             self.data.remove(0);
         }
-        self.data.extend(self.signal.by_ref().take(5));
+        self.data.extend(self.signal.by_ref().take(10));
         self.window[0] += 1.0;
-        self.window[1] += 1.0
+        self.window[1] += 1.0;
     }
 }
 
@@ -159,8 +158,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 
             // Table Layout
-            let rects = Layout::default()
-                .constraints([Constraint::Percentage(100)].as_ref())
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
                 .margin(5)
                 .split(f.size());
 
@@ -194,21 +194,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Constraint::Length(30),
                     Constraint::Max(10),
                 ]);
-            f.render_stateful_widget(t, rects[0], &mut table.state);
+            f.render_stateful_widget(t, chunks[0], &mut table.state);
 
             // Line Graph for selected token
-            let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Ratio(1, 3),
-                    Constraint::Ratio(1, 3),
-                    Constraint::Ratio(1, 3),
-                ]
-                .as_ref(),
-            )
-            .split(size);
-
             let x_labels = vec![
                 Span::styled(
                     format!("{}", token_chart.window[0]),
@@ -239,24 +227,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             )
             .x_axis(
                 Axis::default()
-                        .title("X Axis")
+                        .title("Time")
                         .style(Style::default().fg(Color::Gray))
                         .labels(x_labels)
                         .bounds(token_chart.window),
                 )
                 .y_axis(
                     Axis::default()
-                        .title("Y Axis")
+                        .title("Price")
                         .style(Style::default().fg(Color::Gray))
                         .labels(vec![
-                            Span::styled("-20", Style::default().add_modifier(Modifier::BOLD)),
+                            Span::styled("1800", Style::default().add_modifier(Modifier::BOLD)),
                             Span::raw("0"),
-                            Span::styled("20", Style::default().add_modifier(Modifier::BOLD)),
+                            Span::styled("2420", Style::default().add_modifier(Modifier::BOLD)),
                         ])
                         .bounds([-20.0, 20.0]),
                 );
 
-            f.render_widget(chart, chunks[0]);
+            f.render_widget(chart, chunks[1]);
 
         })?;
 
