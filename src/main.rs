@@ -1,8 +1,13 @@
 mod util;
 
-use crate::util::event::SinSignal;
 
-use crate::util::event::Event;
+use crate::util::event:: {
+    Event,
+    StatefulTable,
+    TabsState,
+    TokenChart
+};
+
 
 use std::io;
 use std::sync::mpsc;
@@ -20,90 +25,11 @@ use tui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::Span,
-    widgets::{Axis,Block, BorderType, Borders, Cell, Chart, Dataset, Row, Table, TableState},
+    text::{Span, Spans},
+    widgets::{Axis,Block, BorderType, Borders, Cell, Chart, Dataset, Row, Table, Tabs},
     symbols,
     Terminal,
 };
-
-pub struct StatefulTable<'a> {
-    state: TableState,
-    items: Vec<Vec<&'a str>>,
-}
-
-impl<'a> StatefulTable<'a> {
-    fn new() -> StatefulTable<'a> {
-        StatefulTable {
-            state: TableState::default(),
-            items: vec![
-                vec!["ETH", "$2,400", "-0.08%"],
-                vec!["USDC", "$1.01", "-0.02%"],
-                vec!["BTC", "$40,000", "+20.54%"],
-                vec!["UNI", "$21.30", "+10.00%"],
-                vec!["DAI", "$1.00", "0.00%"],
-            ],
-        }
-    }
-    pub fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    pub fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-}
-
-
-struct TokenChart {
-    signal: SinSignal,
-    data: Vec<(f64, f64)>,
-    window: [f64; 2],
-}
-
-
-impl TokenChart {
-
-    fn new() -> TokenChart {
-        let mut signal = SinSignal::new(0.1, 2.0, 20.0);
-
-        let data = signal.by_ref().take(200).collect::<Vec<(f64, f64)>>();
-
-        TokenChart {
-            signal,
-            data,
-            window: [0.0, 20.0],
-        }
-    }
-
-    fn update(&mut self) {
-        for _ in 0..10 {
-            self.data.remove(0);
-        }
-        self.data.extend(self.signal.by_ref().take(10));
-        self.window[0] += 1.0;
-        self.window[1] += 1.0;
-    }
-}
 
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -141,6 +67,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut token_chart = TokenChart::new();
 
+    let mut tabs = TabsState::new(vec!["1Min","1H", "1D", "1M", "3M", "6M", "1Y"]);
+
+
     terminal.clear()?;
 
     loop {
@@ -160,7 +89,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Table Layout
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(40), Constraint::Percentage(10)].as_ref())
                 .margin(5)
                 .split(f.size());
 
@@ -209,12 +138,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ),
             ];
 
+            // Chart data
             let dataset = vec![Dataset::default()
                     .name("data")
                     .marker(symbols::Marker::Dot)
                     .style(Style::default().fg(Color::Cyan))
                     .data(&token_chart.data)];
 
+            // Chart Styling
             let chart = Chart::new(dataset)
             .block(
                 Block::default()
@@ -244,7 +175,41 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .bounds([-20.0, 20.0]),
                 );
 
+            //Render the chart at bottom
             f.render_widget(chart, chunks[1]);
+
+            // Tabs
+            let titles = tabs.titles.iter().map(|t| {
+                let (first, rest) = t.split_at(1);
+                Spans::from(vec![
+                    Span::styled(first, Style::default().fg(Color::Yellow)),
+                    Span::styled(rest, Style::default().fg(Color::Green)),
+                ])
+            }).collect();
+
+            let tab_blocks = Tabs::new(titles)
+                .block(Block::default().borders(Borders::ALL).title("Timeline"))
+                .select(tabs.index)
+                .style(Style::default().fg(Color::Cyan))
+                .highlight_style(
+                    Style::default()
+                        .add_modifier(Modifier::BOLD)
+                        .bg(Color::Black),
+            );
+
+            f.render_widget(tab_blocks, chunks[2]);
+
+            let inner = match tabs.index {
+                0 => Block::default().title("Minutes ").borders(Borders::ALL),
+                1 => Block::default().title("Last Hour").borders(Borders::ALL),
+                2 => Block::default().title("Last Day").borders(Borders::ALL),
+                3 => Block::default().title("Last Month").borders(Borders::ALL),
+                4 => Block::default().title("Last Three Months").borders(Borders::ALL),
+                5 => Block::default().title("Last Six Months").borders(Borders::ALL),
+                6 => Block::default().title("Last Year").borders(Borders::ALL),
+                _ => unreachable!(),
+            };
+            f.render_widget(inner, chunks[1]);
 
         })?;
 
@@ -261,6 +226,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 KeyCode::Up => {
                     table.previous();
                 }
+                KeyCode::Right => tabs.next(),
+                KeyCode::Left => tabs.previous(),
                 _ => {}
             },
             Event::Tick => {
