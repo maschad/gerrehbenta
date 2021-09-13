@@ -43,9 +43,8 @@ async fn setup_server() -> io::Result<()> {
                     .max_age(3600)
                     .finish(),
             )
-            .service(web::resource("/graphql").route(web::post().to(graphql)))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("https://gateway.thegraph.com/api/[api-key]/subgraphs/id/0x9bde7bf4d5b13ef94373ced7c8ee0be59735a298-2")?
     .run()
     .await
 }
