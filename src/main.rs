@@ -1,50 +1,33 @@
+use std::error::Error;
 use std::io;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
-use std::{error::Error};
 
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 
-use tui::{
+use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     widgets::{Block, BorderType, Borders},
-
     Terminal,
 };
 
 mod util;
 mod widgets;
 
-use crate::util::event:: {
-    Event,
-};
-
+use crate::util::event::Event;
 
 use crate::widgets::{
-    chart::{
-        render_chart,
-        TokenChart
-    },
-    tabs::{
-        render_tab_blocks,
-        render_tab_titles,
-        TabsState
-    },
-    table::{
-        render_table,
-        StatefulTable
-    }
+    chart::{render_chart, TokenChart},
+    table::{render_table, StatefulTable},
+    tabs::{render_tab_blocks, render_tab_titles, TabsState},
 };
 
-
-
 fn main() -> Result<(), Box<dyn Error>> {
-
     enable_raw_mode().expect("can run in raw mode");
 
     let (tx, rx) = mpsc::channel();
@@ -78,8 +61,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut token_chart = TokenChart::new();
 
-    let mut tabs = TabsState::new(vec!["1Min","1H", "1D", "1M", "3M", "6M", "1Y"]);
-
+    let mut tabs = TabsState::new(vec!["1Min", "1H", "1D", "1M", "3M", "6M", "1Y"]);
 
     terminal.clear()?;
 
@@ -96,10 +78,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .border_type(BorderType::Thick);
             f.render_widget(block, size);
 
-
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(40), Constraint::Percentage(10)].as_ref())
+                .constraints(
+                    [
+                        Constraint::Percentage(50),
+                        Constraint::Percentage(40),
+                        Constraint::Percentage(10),
+                    ]
+                    .as_ref(),
+                )
                 .margin(5)
                 .split(f.size());
 
@@ -114,7 +102,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             // Render tabs at the bery bottom
             f.render_widget(render_tab_blocks(&mut tabs), chunks[2]);
-
         })?;
 
         match rx.recv()? {

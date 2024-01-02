@@ -1,10 +1,8 @@
-use tui::{
-    layout::{Constraint},
+use ratatui::{
+    layout::Constraint,
     style::{Color, Modifier, Style},
-    widgets::{Cell, Row, Table,TableState}
-
+    widgets::{Cell, Row, Table, TableState},
 };
-
 
 pub struct StatefulTable<'a> {
     pub state: TableState,
@@ -54,9 +52,7 @@ impl<'a> StatefulTable<'a> {
     }
 }
 
-
 pub fn render_table<'a>(table: &StatefulTable<'a>) -> Table<'a> {
-
     // Table Layout
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default().bg(Color::Blue);
@@ -79,15 +75,16 @@ pub fn render_table<'a>(table: &StatefulTable<'a>) -> Table<'a> {
     });
 
     // Stateful Table for tokens
-    let t = Table::new(rows)
+    let widths = &[
+        Constraint::Percentage(50),
+        Constraint::Length(30),
+        Constraint::Max(10),
+    ];
+
+    let t = Table::new(rows, widths)
         .header(header)
         .highlight_style(selected_style)
-        .highlight_symbol(">> ")
-        .widths(&[
-            Constraint::Percentage(50),
-            Constraint::Length(30),
-            Constraint::Max(10),
-        ]);
+        .highlight_symbol(">> ");
 
     t
 }

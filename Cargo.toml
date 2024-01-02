@@ -6,6 +6,6 @@ edition = "2018"
 
 
 [dependencies]
-crossterm = { version = "0.19" }
+crossterm = "0.27.0"
 rand = { version = "0.7.3", default-features = false, features = ["std"] }
-tui = { version = "0.14", default-features = false, features = ['crossterm'] }
+ratatui = "0.25.0"
