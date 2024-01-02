@@ -1,11 +1,12 @@
 [package]
-name = "reem"
+name = "gerrehbenta"
 version = "0.1.0"
 authors = ["Chad Nehemiah <chad.nehemiah94@gmail.com>"]
 edition = "2018"
 
 
 [dependencies]
+cfonts = "1.1.0"
 crossterm = "0.27.0"
 rand = { version = "0.7.3", default-features = false, features = ["std"] }
 ratatui = "0.25.0"

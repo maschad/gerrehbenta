@@ -1,11 +1,11 @@
 [package]
-name = "reem-api"
+name = "gerrehbenta-api"
 version = "1.0.0"
 authors = ["maschad <chad.nehemiah94@gmail.com>"]
 edition = "2021"
 license = "MIT"
-description = "API for Reem"
-repository= "https://github.com/maschad/reem"
+description = "API for Gerrehbenta"
+repository = "https://github.com/maschad/gerrehbenta"
 
 [dependencies]
 thiserror = "1.0"
