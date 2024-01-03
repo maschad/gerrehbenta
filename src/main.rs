@@ -25,7 +25,7 @@ use crate::util::event::Event;
 use crate::widgets::{
     chart::{render_chart, TokenChart},
     table::{render_table, StatefulTable},
-    tabs::{render_tab_blocks, render_tab_titles, TabsState},
+    tabs::{render_tab_titles, TabsState},
 };
 
 fn main() -> Result<(), Box<dyn Error>> {
