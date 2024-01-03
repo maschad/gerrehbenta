@@ -55,10 +55,10 @@ impl<'a> StatefulTable<'a> {
 pub fn render_table<'a>(table: &StatefulTable<'a>) -> Table<'a> {
     // Table Layout
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default().bg(Color::Blue);
+    let normal_style = Style::default().bg(Color::LightBlue);
     let header_cells = ["Name", "Price", "Volume"]
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
+        .map(|h| Cell::from(*h).style(Style::default().fg(Color::White)));
     let header = Row::new(header_cells)
         .style(normal_style)
         .height(1)

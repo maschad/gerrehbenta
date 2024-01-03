@@ -15,6 +15,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders},
     Terminal,
 };
+use widgets::welcome::render_welcome;
 
 mod util;
 mod widgets;
@@ -82,26 +83,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .direction(Direction::Vertical)
                 .constraints(
                     [
-                        Constraint::Percentage(50),
+                        Constraint::Percentage(30),
                         Constraint::Percentage(40),
-                        Constraint::Percentage(10),
+                        Constraint::Percentage(30),
                     ]
                     .as_ref(),
                 )
                 .margin(5)
                 .split(f.size());
 
+            // Render welcome
+            f.render_widget(render_welcome(), chunks[0]);
+
             // Render the table at the top
-            f.render_stateful_widget(render_table(&mut table), chunks[0], &mut table.state);
+            f.render_stateful_widget(render_table(&mut table), chunks[1], &mut table.state);
 
             // Render the chart at bottom
-            f.render_widget(render_chart(&mut token_chart), chunks[1]);
+            f.render_widget(render_chart(&mut token_chart), chunks[2]);
 
             // Render Tab Titles at the top
-            f.render_widget(render_tab_titles(&mut tabs), chunks[1]);
-
-            // Render tabs at the bery bottom
-            f.render_widget(render_tab_blocks(&mut tabs), chunks[2]);
+            f.render_widget(render_tab_titles(&mut tabs), chunks[2]);
         })?;
 
         match rx.recv()? {
