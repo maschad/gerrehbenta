@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::io;
+use std::io::{self, Write};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -15,8 +15,11 @@ use ratatui::{
     widgets::{Block, BorderType, Borders},
     Terminal,
 };
+use widgets::search::render_search_block;
 use widgets::welcome::render_welcome;
 
+mod models;
+mod network;
 mod util;
 mod widgets;
 
@@ -55,6 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let stdout = io::stdout();
+    let mut stdout = stdout.lock();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
@@ -95,8 +99,10 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Render welcome
             f.render_widget(render_welcome(), chunks[0]);
 
-            // Render the table at the top
-            f.render_stateful_widget(render_table(&mut table), chunks[1], &mut table.state);
+            // Render search bar at the stop
+            // f.render_widget(render_search_block(word), chunks[1]);
+
+            // f.render_stateful_widget(render_table(&mut table), chunks[1], &mut table.state);
 
             // Render the chart at bottom
             f.render_widget(render_chart(&mut token_chart), chunks[2]);
@@ -112,6 +118,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     terminal.show_cursor()?;
                     break;
                 }
+                KeyCode::Char('s') => {}
                 KeyCode::Down => {
                     table.next();
                 }
@@ -120,6 +127,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
                 KeyCode::Right => tabs.next(),
                 KeyCode::Left => tabs.previous(),
+                KeyCode::Esc | KeyCode::Enter => {
+                    break;
+                }
                 _ => {}
             },
             Event::Tick => {

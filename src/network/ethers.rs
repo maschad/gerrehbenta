@@ -1,14 +1,6 @@
 pub mod types {
-    use ethers::{
-        core::{
-            abi::Abi,
-            types::{Address, Block, Transaction, TransactionReceipt, U256},
-        },
-        etherscan::contract::ContractMetadata,
-    };
+    use ethers::core::types::{Address, U256};
     use serde::{Deserialize, Deserializer};
-    use std::cmp::PartialEq;
-    use url::Url;
 
     #[derive(Clone, Debug)]
     pub struct AddressInfo {

@@ -1,6 +1,25 @@
+use crate::models::position::Position;
+use ethers::core::types::{Address, NameOrAddress};
+use serde::Deserialize;
+
+#[derive(Deserialize, Clone, Debug)]
+pub struct Etherscan {
+    api_key: Option<String>,
+}
+
 #[derive(Clone)]
 pub struct Network<'a> {
-    pub app: &'a Arc<Mutex<App>>,
     endpoint: &'a str,
     etherscan: &'a Option<Etherscan>,
+}
+
+pub enum IoEvent {
+    GetNameOrAddressInfo {
+        name_or_address: NameOrAddress,
+        is_searching: bool,
+    },
+    GetAddressInfo {
+        address: Address,
+        positions: Option<Vec<Position>>,
+    },
 }
