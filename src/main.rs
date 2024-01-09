@@ -1,9 +1,10 @@
 use std::error::Error;
-use std::io::{self, Write};
-use std::sync::mpsc;
+use std::io::{self};
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use app::{App, InputMode};
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
@@ -15,9 +16,11 @@ use ratatui::{
     widgets::{Block, BorderType, Borders},
     Terminal,
 };
+use tokio::sync::Mutex;
 use widgets::search::render_search_block;
 use widgets::welcome::render_welcome;
 
+mod app;
 mod models;
 mod network;
 mod util;
@@ -31,11 +34,16 @@ use crate::widgets::{
     tabs::{render_tab_titles, TabsState},
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     enable_raw_mode().expect("can run in raw mode");
 
     let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(200);
+
+    let app = Arc::new(Mutex::new(App::default()));
+    let mut app = app.lock().await;
+
     thread::spawn(move || {
         let mut last_tick = Instant::now();
         loop {
@@ -58,15 +66,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let stdout = io::stdout();
-    let mut stdout = stdout.lock();
+    let stdout = stdout.lock();
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
     let mut table = StatefulTable::new();
-
     let mut token_chart = TokenChart::new();
 
-    let mut tabs = TabsState::new(vec!["1Min", "1H", "1D", "1M", "3M", "6M", "1Y"]);
+    let word = String::new();
 
     terminal.clear()?;
 
@@ -87,28 +94,25 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .direction(Direction::Vertical)
                 .constraints(
                     [
-                        Constraint::Percentage(30),
+                        Constraint::Percentage(10),
+                        Constraint::Percentage(50),
                         Constraint::Percentage(40),
-                        Constraint::Percentage(30),
                     ]
                     .as_ref(),
                 )
                 .margin(5)
                 .split(f.size());
 
-            // Render welcome
-            f.render_widget(render_welcome(), chunks[0]);
+            if let Some((search_bar, search_bar_rect)) = render_search_block(chunks[0], &mut app) {
+                // Render search bar at the stop
+                f.render_widget(search_bar, search_bar_rect);
+            }
 
-            // Render search bar at the stop
-            // f.render_widget(render_search_block(word), chunks[1]);
+            // Render welcome in the middle
+            f.render_widget(render_welcome(), chunks[1]);
 
-            // f.render_stateful_widget(render_table(&mut table), chunks[1], &mut table.state);
-
-            // Render the chart at bottom
-            f.render_widget(render_chart(&mut token_chart), chunks[2]);
-
-            // Render Tab Titles at the top
-            f.render_widget(render_tab_titles(&mut tabs), chunks[2]);
+            // Render table at the bottom
+            f.render_stateful_widget(render_table(&mut table), chunks[2], &mut table.state);
         })?;
 
         match rx.recv()? {
@@ -118,15 +122,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                     terminal.show_cursor()?;
                     break;
                 }
-                KeyCode::Char('s') => {}
+                KeyCode::Char('s') => {
+                    app.input_mode = InputMode::Editing;
+                }
                 KeyCode::Down => {
                     table.next();
                 }
                 KeyCode::Up => {
                     table.previous();
                 }
-                KeyCode::Right => tabs.next(),
-                KeyCode::Left => tabs.previous(),
                 KeyCode::Esc | KeyCode::Enter => {
                     break;
                 }

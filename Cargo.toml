@@ -14,5 +14,5 @@ futures = "0.3.30"
 rand = { version = "0.7.3", default-features = false, features = ["std"] }
 ratatui = "0.25.0"
 serde = "1.0.194"
-tokio = "1.35.1"
+tokio = { version = "1.35.1", features = ["full"] }
 url = "2.5.0"
