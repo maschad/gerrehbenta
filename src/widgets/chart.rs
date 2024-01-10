@@ -1,11 +1,11 @@
-use crate::util::event::SinSignal;
-
 use ratatui::{
     style::{Color, Modifier, Style},
     symbols,
     text::Span,
     widgets::{Axis, Block, Borders, Chart, Dataset},
 };
+
+use crate::models::event_handling::SinSignal;
 
 pub struct TokenChart {
     pub signal: SinSignal,

@@ -10,6 +10,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 
+use models::event_handling::Event;
 use models::states::InputMode;
 use ratatui::{
     backend::CrosstermBackend,
@@ -27,8 +28,6 @@ mod network;
 mod routes;
 mod util;
 mod widgets;
-
-use crate::util::event::Event;
 
 use crate::widgets::{
     chart::{render_chart, TokenChart},
@@ -116,6 +115,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // Render table at the bottom
             f.render_stateful_widget(render_table(&mut table), chunks[2], &mut table.state);
         })?;
+
+        // #TODO: Move this to event handling
 
         match rx.recv()? {
             Event::Input(event) => match event.code {

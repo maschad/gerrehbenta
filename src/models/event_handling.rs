@@ -1,8 +1,7 @@
 pub enum Event<I> {
-	Input(I),
-	Tick,
+    Input(I),
+    Tick,
 }
-
 
 pub struct SinSignal {
     x: f64,
