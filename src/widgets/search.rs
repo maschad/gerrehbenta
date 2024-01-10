@@ -20,7 +20,7 @@ pub fn render_search_block<'a>(
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
-    let input = Paragraph::new(app.input.as_str())
+    let input = Paragraph::new(app.search_input.as_str())
         .style(Style::default().fg(Color::White))
         .block(searchbar_block);
 

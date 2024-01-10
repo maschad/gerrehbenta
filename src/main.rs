@@ -18,6 +18,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders},
     Terminal,
 };
+use routes::{ActiveBlock, Route, RouteId};
 use tokio::sync::Mutex;
 use widgets::search::render_search_block;
 use widgets::welcome::render_welcome;
@@ -117,32 +118,67 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })?;
 
         // #TODO: Move this to event handling
-
         match rx.recv()? {
-            Event::Input(event) => match event.code {
-                KeyCode::Char('q') => {
-                    disable_raw_mode()?;
-                    terminal.show_cursor()?;
-                    break;
+            Event::Input(event) => {
+                if let ActiveBlock::SearchBar = app.get_current_route().get_active_block() {
+                    match app.input_mode {
+                        InputMode::Normal => match event.code {
+                            KeyCode::Char('e') => {
+                                app.input_mode = InputMode::Editing;
+                            }
+                            _ => {}
+                        },
+                        InputMode::Editing => match event.code {
+                            KeyCode::Esc => {
+                                app.input_mode = InputMode::Normal;
+                            }
+                            KeyCode::Char(c) => {
+                                app.enter_char(c);
+                            }
+                            KeyCode::Left => {
+                                app.move_cursor_left();
+                            }
+                            KeyCode::Right => {
+                                app.move_cursor_right();
+                            }
+                            KeyCode::Backspace => {
+                                app.delete_char();
+                            }
+                            KeyCode::Enter => {
+                                app.input_mode = InputMode::Normal;
+
+                                let message = app.submit_search();
+                                app.set_route(Route::new(
+                                    RouteId::Searching(message),
+                                    ActiveBlock::MyPosition,
+                                ));
+                            }
+                            _ => {}
+                        },
+                    }
+                } else {
+                    match event.code {
+                        KeyCode::Char('q') => {
+                            disable_raw_mode()?;
+                            terminal.clear()?;
+                            terminal.show_cursor()?;
+                            break;
+                        }
+                        KeyCode::Char('h') => {
+                            app.show_help = true;
+                        }
+                        KeyCode::Esc => {
+                            app.show_help = false;
+                        }
+                        _ => {}
+                    }
                 }
-                KeyCode::Char('s') => {
-                    app.input_mode = InputMode::Editing;
-                }
-                KeyCode::Down => {
-                    table.next();
-                }
-                KeyCode::Up => {
-                    table.previous();
-                }
-                KeyCode::Esc | KeyCode::Enter => {
-                    break;
-                }
-                _ => {}
-            },
+            }
             Event::Tick => {
                 token_chart.update();
             }
         }
     }
+
     Ok(())
 }

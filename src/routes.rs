@@ -7,7 +7,7 @@ pub enum RouteId {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ActiveBlock {
     SearchBar,
-    Main,
+    MyPosition,
 }
 
 #[derive(Clone)]
@@ -34,7 +34,7 @@ impl Default for Route {
     fn default() -> Self {
         Self {
             id: RouteId::Welcome,
-            active_block: ActiveBlock::SearchBar,
+            active_block: ActiveBlock::MyPosition,
         }
     }
 }

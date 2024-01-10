@@ -13,8 +13,8 @@ pub struct Network<'a> {
     etherscan: &'a Option<Etherscan>,
 }
 
-pub enum IoEvent {
-    GetNameOrAddressInfo {
+pub enum NetworkEvent {
+    GetENSAddressInfo {
         name_or_address: NameOrAddress,
         is_searching: bool,
     },
