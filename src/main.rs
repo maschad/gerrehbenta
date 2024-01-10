@@ -4,12 +4,13 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use app::{App, InputMode};
+use app::App;
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 
+use models::states::InputMode;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -23,6 +24,7 @@ use widgets::welcome::render_welcome;
 mod app;
 mod models;
 mod network;
+mod routes;
 mod util;
 mod widgets;
 
