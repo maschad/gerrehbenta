@@ -1,13 +1,16 @@
+use crate::network::ethers::types::AddressInfo;
+
 #[derive(Clone)]
 pub enum RouteId {
     Welcome,
     Searching(String),
+    AddressInfo(Option<AddressInfo>),
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ActiveBlock {
     SearchBar,
-    MyPosition,
+    MyPositions,
 }
 
 #[derive(Clone)]
@@ -34,7 +37,7 @@ impl Default for Route {
     fn default() -> Self {
         Self {
             id: RouteId::Welcome,
-            active_block: ActiveBlock::MyPosition,
+            active_block: ActiveBlock::MyPositions,
         }
     }
 }

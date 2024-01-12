@@ -5,11 +5,21 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use app::App;
+use chrono::Utc;
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use network::network::{handle_tokio, Network, NetworkEvent};
 
+use crate::widgets::{
+    chart::{render_chart, TokenChart},
+    search::render_search_block,
+    table::{render_table, StatefulTable},
+    tabs::{render_tab_titles, TabsState},
+    welcome::render_welcome,
+};
+use clap::Parser;
 use models::event_handling::Event;
 use models::states::InputMode;
 use ratatui::{
@@ -19,9 +29,10 @@ use ratatui::{
     Terminal,
 };
 use routes::{ActiveBlock, Route, RouteId};
+use simplelog::{
+    ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger,
+};
 use tokio::sync::Mutex;
-use widgets::search::render_search_block;
-use widgets::welcome::render_welcome;
 
 mod app;
 mod models;
@@ -30,22 +41,46 @@ mod routes;
 mod util;
 mod widgets;
 
-use crate::widgets::{
-    chart::{render_chart, TokenChart},
-    table::{render_table, StatefulTable},
-    tabs::{render_tab_titles, TabsState},
-};
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Etherscan Json-RPC URL
+    #[arg(short, long, default_value = "https://eth.public-rpc.com")]
+    etherscan_endpoint: String,
+    /// Uniswap v3 Subgraph URL
+    #[arg(
+        short,
+        long,
+        default_value = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3/graphql"
+    )]
+    uniswap_v3_endpoint: String,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    let _ = std::fs::create_dir("logs");
+
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Error,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Debug,
+            Config::default(),
+            std::fs::File::create(format!("logs/{}.log", Utc::now().format("%Y%m%d%H%M"))).unwrap(),
+        ),
+    ])
+    .unwrap();
+
     enable_raw_mode().expect("can run in raw mode");
 
     let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(200);
 
-    let app = Arc::new(Mutex::new(App::default()));
-    let mut app = app.lock().await;
-
+    // Start tick thread
     thread::spawn(move || {
         let mut last_tick = Instant::now();
         loop {
@@ -67,11 +102,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    let app = Arc::new(Mutex::new(App::default()));
+    let cloned_app = app.clone();
+    let args = Args::parse();
+    let (sync_network_tx, sync_network_rx) = mpsc::channel::<NetworkEvent>();
+
+    // Start network thread
+    std::thread::spawn(move || {
+        let mut network = Network::default(app, args.etherscan_endpoint, args.uniswap_v3_endpoint);
+        handle_tokio(sync_network_rx, &mut network);
+    });
+
     let stdout = io::stdout();
     let stdout = stdout.lock();
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
 
+    let mut app = cloned_app.lock().await;
+    let mut terminal = Terminal::new(backend)?;
     let mut table = StatefulTable::new();
     let mut token_chart = TokenChart::new();
 
@@ -150,7 +197,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 let message = app.submit_search();
                                 app.set_route(Route::new(
                                     RouteId::Searching(message),
-                                    ActiveBlock::MyPosition,
+                                    ActiveBlock::MyPositions,
                                 ));
                             }
                             _ => {}
