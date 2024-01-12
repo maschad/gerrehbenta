@@ -37,7 +37,7 @@ impl Default for Route {
     fn default() -> Self {
         Self {
             id: RouteId::Welcome,
-            active_block: ActiveBlock::MyPositions,
+            active_block: ActiveBlock::SearchBar,
         }
     }
 }

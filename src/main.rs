@@ -11,6 +11,9 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use network::network::{handle_tokio, Network, NetworkEvent};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::Paragraph;
+use util::constants::{GENERAL_HELP_TEXT, TICK_RATE};
 
 use crate::widgets::{
     chart::{render_chart, TokenChart},
@@ -78,7 +81,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     enable_raw_mode().expect("can run in raw mode");
 
     let (tx, rx) = mpsc::channel();
-    let tick_rate = Duration::from_millis(200);
+    let tick_rate = Duration::from_millis(TICK_RATE);
 
     // Start tick thread
     thread::spawn(move || {
@@ -162,6 +165,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
             // Render table at the bottom
             f.render_stateful_widget(render_table(&mut table), chunks[2], &mut table.state);
+            //Render the help text at the bottom
+            let help_text = Paragraph::new(GENERAL_HELP_TEXT)
+                .style(Style::default().fg(Color::White))
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_type(BorderType::Plain),
+                );
+            f.render_widget(help_text, chunks[2]);
         })?;
 
         // #TODO: Move this to event handling
@@ -172,6 +184,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         InputMode::Normal => match event.code {
                             KeyCode::Char('e') => {
                                 app.input_mode = InputMode::Editing;
+                            }
+                            KeyCode::Char('q') => {
+                                disable_raw_mode()?;
+                                terminal.clear()?;
+                                terminal.show_cursor()?;
+                                break;
                             }
                             _ => {}
                         },

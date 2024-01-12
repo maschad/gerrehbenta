@@ -1,6 +1,6 @@
 use ratatui::{prelude::*, widgets::*};
 
-use crate::app::App;
+use crate::{app::App, models::states::InputMode, routes::ActiveBlock};
 
 pub fn render_search_block<'a>(
     outer: Rect,
@@ -15,8 +15,20 @@ pub fn render_search_block<'a>(
     };
 
     let searchbar_block = Block::default()
-        .border_style(Style::default())
-        .title(format!("Search by Address / ENS"))
+        .border_style(Style::default().fg(
+            if let ActiveBlock::SearchBar = app.get_current_route().get_active_block() {
+                Color::Green
+            } else {
+                Color::White
+            },
+        ))
+        .title(format!(
+            "Search by Address / ENS ({})",
+            match app.input_mode {
+                InputMode::Normal => "Press 'q' to exit, 'e' to start editing.",
+                InputMode::Editing => "Press 'Esc' to stop editing, 'Enter' to search.",
+            }
+        ))
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
