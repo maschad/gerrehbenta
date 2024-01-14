@@ -10,6 +10,7 @@ use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+use ethers::core::k256::sha2::digest::Key;
 use network::network::{handle_tokio, Network, NetworkEvent};
 use ratatui::backend::Backend;
 use ratatui::layout::Rect;
@@ -137,18 +138,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // with at least a margin of 1
             let size = f.size();
 
-            let outer_block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Thick);
-            f.render_widget(outer_block, size);
-
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(
                     [
                         Constraint::Percentage(10),
-                        Constraint::Percentage(50),
-                        Constraint::Percentage(30),
+                        Constraint::Percentage(40),
+                        Constraint::Percentage(40),
                         Constraint::Percentage(10),
                     ]
                     .as_ref(),
@@ -169,14 +165,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             // Render welcome in the middle
-            let (welcome, welcome_block) = render_welcome();
+            let (welcome, welcome_block) = render_welcome(&mut app);
             f.render_widget(welcome_block, chunks[1]);
             f.render_widget(welcome, chunks[1]);
 
             // Render table at the bottom
-            let (table_widget, table_block) = render_table(&table);
-            f.render_widget(table_block, chunks[2]);
-            f.render_stateful_widget(table_widget, chunks[2], &mut table.state);
+            f.render_stateful_widget(render_table(&table, &mut app), chunks[2], &mut table.state);
 
             //Render the help text at the bottom
             let help_text = Paragraph::new(GENERAL_HELP_TEXT)
@@ -206,6 +200,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             }
                             KeyCode::Char('h') => {
                                 app.show_help = true;
+                            }
+                            KeyCode::Char('1') => {
+                                app.change_active_block(ActiveBlock::PositionInfo);
+                            }
+                            KeyCode::Char('2') => {
+                                app.change_active_block(ActiveBlock::MyPositions);
                             }
                             KeyCode::Esc => {
                                 app.show_help = false;
@@ -250,6 +250,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                         KeyCode::Char('h') => {
                             app.show_help = true;
+                        }
+                        KeyCode::Char('s') => {
+                            app.change_active_block(ActiveBlock::SearchBar);
                         }
                         KeyCode::Esc => {
                             app.show_help = false;

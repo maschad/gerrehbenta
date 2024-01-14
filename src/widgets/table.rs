@@ -4,6 +4,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Cell, Row, Table, TableState},
 };
 
+use crate::{app::App, routes::ActiveBlock};
+
 pub struct StatefulTable<'a> {
     pub state: TableState,
     pub items: Vec<Vec<&'a str>>,
@@ -15,11 +17,9 @@ impl<'a> StatefulTable<'a> {
             state: TableState::default(),
             // #TODO: Pull token prices and populate here
             items: vec![
-                vec!["ETH", "$2,400", "-0.08%"],
-                vec!["USDC", "$1.01", "-0.02%"],
-                vec!["BTC", "$40,000", "+20.54%"],
-                vec!["UNI", "$21.30", "+10.00%"],
-                vec!["DAI", "$1.00", "0.00%"],
+                vec!["USDC/ETH", "$2,400", "✓", "2d"],
+                vec!["ETH/MATIC", "$100", "X", "10d"],
+                vec!["USDC/TETH", "$2,000", "✓", "2w"],
             ],
         }
     }
@@ -52,7 +52,7 @@ impl<'a> StatefulTable<'a> {
     }
 }
 
-pub fn render_table<'a>(table: &StatefulTable<'a>) -> (Table<'a>, Block<'a>) {
+pub fn render_table<'a>(table: &StatefulTable<'a>, app: &'a mut App) -> Table<'a> {
     // Table Layout
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default().bg(Color::LightBlue);
@@ -62,7 +62,7 @@ pub fn render_table<'a>(table: &StatefulTable<'a>) -> (Table<'a>, Block<'a>) {
     let header = Row::new(header_cells)
         .style(normal_style)
         .height(1)
-        .bottom_margin(1);
+        .bottom_margin(5);
     let rows = table.items.iter().map(|item| {
         let height = item
             .iter()
@@ -74,22 +74,31 @@ pub fn render_table<'a>(table: &StatefulTable<'a>) -> (Table<'a>, Block<'a>) {
         Row::new(cells).height(height as u16).bottom_margin(1)
     });
 
-    // Stateful Table for tokens
+    // Stateful Table for positions
     let widths = &[
-        Constraint::Percentage(50),
-        Constraint::Length(30),
-        Constraint::Max(10),
+        Constraint::Percentage(20),
+        Constraint::Percentage(20),
+        Constraint::Percentage(20),
+        Constraint::Percentage(20),
     ];
 
     let table = Table::new(rows, widths)
         .header(header)
         .highlight_style(selected_style)
-        .highlight_symbol(">> ");
+        .highlight_symbol(">> ")
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Thick)
+                .border_style(Style::default().fg(
+                    if let ActiveBlock::MyPositions = app.get_current_route().get_active_block() {
+                        Color::Green
+                    } else {
+                        Color::White
+                    },
+                ))
+                .title("My Positions"),
+        );
 
-    let block = Block::default()
-        .title("My Positions")
-        .borders(Borders::ALL)
-        .border_type(BorderType::Thick);
-
-    (table, block)
+    table
 }
