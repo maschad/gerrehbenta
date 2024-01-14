@@ -11,9 +11,12 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use network::network::{handle_tokio, Network, NetworkEvent};
+use ratatui::backend::Backend;
+use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Clear, Paragraph};
 use util::constants::{GENERAL_HELP_TEXT, TICK_RATE};
+use widgets::help::render_help_popup;
 
 use crate::widgets::{
     chart::{render_chart, TokenChart},
@@ -125,8 +128,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut table = StatefulTable::new();
     let mut token_chart = TokenChart::new();
 
-    let word = String::new();
-
     terminal.clear()?;
 
     loop {
@@ -136,11 +137,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // with at least a margin of 1
             let size = f.size();
 
-            let block = Block::default()
+            let outer_block = Block::default()
                 .borders(Borders::ALL)
-                .title("Top Tokens")
                 .border_type(BorderType::Thick);
-            f.render_widget(block, size);
+            f.render_widget(outer_block, size);
 
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
@@ -148,12 +148,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     [
                         Constraint::Percentage(10),
                         Constraint::Percentage(50),
-                        Constraint::Percentage(40),
+                        Constraint::Percentage(30),
+                        Constraint::Percentage(10),
                     ]
                     .as_ref(),
                 )
-                .margin(5)
+                .margin(1)
                 .split(f.size());
+
+            if app.show_help {
+                let (help, help_block, help_area) = render_help_popup(size);
+                f.render_widget(Clear, help_area); //this clears out the background
+                f.render_widget(help_block, help_area);
+                f.render_widget(help, help_area);
+            }
 
             if let Some((search_bar, search_bar_rect)) = render_search_block(chunks[0], &mut app) {
                 // Render search bar at the stop
@@ -161,10 +169,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             // Render welcome in the middle
-            f.render_widget(render_welcome(), chunks[1]);
+            let (welcome, welcome_block) = render_welcome();
+            f.render_widget(welcome_block, chunks[1]);
+            f.render_widget(welcome, chunks[1]);
 
             // Render table at the bottom
-            f.render_stateful_widget(render_table(&mut table), chunks[2], &mut table.state);
+            let (table_widget, table_block) = render_table(&table);
+            f.render_widget(table_block, chunks[2]);
+            f.render_stateful_widget(table_widget, chunks[2], &mut table.state);
+
             //Render the help text at the bottom
             let help_text = Paragraph::new(GENERAL_HELP_TEXT)
                 .style(Style::default().fg(Color::White))
@@ -173,7 +186,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         .borders(Borders::ALL)
                         .border_type(BorderType::Plain),
                 );
-            f.render_widget(help_text, chunks[2]);
+            f.render_widget(help_text, chunks[3]);
         })?;
 
         // #TODO: Move this to event handling
@@ -190,6 +203,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 terminal.clear()?;
                                 terminal.show_cursor()?;
                                 break;
+                            }
+                            KeyCode::Char('h') => {
+                                app.show_help = true;
+                            }
+                            KeyCode::Esc => {
+                                app.show_help = false;
                             }
                             _ => {}
                         },
@@ -234,6 +253,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                         KeyCode::Esc => {
                             app.show_help = false;
+                        }
+                        KeyCode::Up => {
+                            table.previous();
+                        }
+                        KeyCode::Down => {
+                            table.next();
+                        }
+                        KeyCode::Char('1') => {
+                            app.change_active_block(ActiveBlock::PositionInfo);
+                        }
+                        KeyCode::Char('2') => {
+                            app.change_active_block(ActiveBlock::MyPositions);
                         }
                         _ => {}
                     }

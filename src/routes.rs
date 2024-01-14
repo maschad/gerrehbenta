@@ -11,6 +11,7 @@ pub enum RouteId {
 pub enum ActiveBlock {
     SearchBar,
     MyPositions,
+    PositionInfo,
 }
 
 #[derive(Clone)]

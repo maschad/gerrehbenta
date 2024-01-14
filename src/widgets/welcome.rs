@@ -1,6 +1,11 @@
 use ratatui::{prelude::*, widgets::*};
 
-pub fn render_welcome<'a>() -> Paragraph<'a> {
+pub fn render_welcome<'a>() -> (Paragraph<'a>, Block<'a>) {
+    let outer_block = Block::default()
+        .title("Position Info")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain);
+
     let banner = Paragraph::new(Text::from(
         cfonts::render(cfonts::Options {
             text: String::from("gerrehbenta"),
@@ -12,5 +17,5 @@ pub fn render_welcome<'a>() -> Paragraph<'a> {
     .wrap(Wrap { trim: false })
     .alignment(Alignment::Center);
 
-    banner
+    (banner, outer_block)
 }

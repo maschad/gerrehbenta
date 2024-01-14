@@ -1,7 +1,7 @@
 use ratatui::{
     layout::Constraint,
     style::{Color, Modifier, Style},
-    widgets::{Cell, Row, Table, TableState},
+    widgets::{Block, BorderType, Borders, Cell, Row, Table, TableState},
 };
 
 pub struct StatefulTable<'a> {
@@ -52,11 +52,11 @@ impl<'a> StatefulTable<'a> {
     }
 }
 
-pub fn render_table<'a>(table: &StatefulTable<'a>) -> Table<'a> {
+pub fn render_table<'a>(table: &StatefulTable<'a>) -> (Table<'a>, Block<'a>) {
     // Table Layout
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default().bg(Color::LightBlue);
-    let header_cells = ["Name", "Price", "Volume"]
+    let header_cells = ["Name", "Fees", "In-Range", "Age"]
         .iter()
         .map(|h| Cell::from(*h).style(Style::default().fg(Color::White)));
     let header = Row::new(header_cells)
@@ -81,10 +81,15 @@ pub fn render_table<'a>(table: &StatefulTable<'a>) -> Table<'a> {
         Constraint::Max(10),
     ];
 
-    let t = Table::new(rows, widths)
+    let table = Table::new(rows, widths)
         .header(header)
         .highlight_style(selected_style)
         .highlight_symbol(">> ");
 
-    t
+    let block = Block::default()
+        .title("My Positions")
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick);
+
+    (table, block)
 }
