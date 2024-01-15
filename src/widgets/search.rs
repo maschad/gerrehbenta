@@ -23,8 +23,8 @@ pub fn render_search_block<'a>(
             },
         ))
         .title(format!(
-            "Search by Address / ENS ({})",
-            match app.input_mode {
+            "Type either an ENS or Ethereum-based address to search for a position ({})",
+            match app.search_state.input_mode {
                 InputMode::Normal => "Press 'q' to exit, 'e' to start editing.",
                 InputMode::Editing => "Press 'Esc' to stop editing, 'Enter' to search.",
             }
@@ -32,7 +32,7 @@ pub fn render_search_block<'a>(
         .borders(Borders::ALL)
         .border_type(BorderType::Plain);
 
-    let input = Paragraph::new(app.search_input.as_str())
+    let input = Paragraph::new(app.search_state.current_search_query.as_str())
         .style(Style::default().fg(Color::White))
         .block(searchbar_block);
 

@@ -2,7 +2,7 @@ use ethers::types::NameOrAddress;
 use std::sync::mpsc::Sender;
 
 use crate::{
-    models::states::InputMode,
+    models::states::AppSearchState,
     network::network::NetworkEvent,
     routes::{ActiveBlock, Route},
 };
@@ -10,15 +10,11 @@ use crate::{
 // App holds the state of the application
 pub struct App {
     /// Current input mode
-    pub input_mode: InputMode,
+    pub search_state: AppSearchState,
     /// History of recorded messages
     pub messages: Vec<String>,
-    // Current input into search bar
-    pub search_input: String,
     /// whether to show help dialogue
     pub show_help: bool,
-    /// Position of the cursor
-    pub cursor_position: usize,
     /// Current route
     pub routes: Vec<Route>,
     /// Whether the app is loading
@@ -30,9 +26,7 @@ pub struct App {
 impl App {
     pub fn default() -> App {
         App {
-            cursor_position: 0,
-            search_input: "".to_owned(),
-            input_mode: InputMode::Normal,
+            search_state: AppSearchState::default(),
             messages: Vec::new(),
             routes: vec![Route::default()],
             show_help: false,
@@ -65,56 +59,68 @@ impl App {
     }
 
     pub fn move_cursor_left(&mut self) {
-        let cursor_moved_left = self.cursor_position.saturating_sub(1);
-        self.cursor_position = self.clamp_cursor(cursor_moved_left);
+        let cursor_moved_left = self.search_state.cursor_position.saturating_sub(1);
+        self.search_state.cursor_position = self.clamp_cursor(cursor_moved_left);
     }
 
     pub fn move_cursor_right(&mut self) {
-        let cursor_moved_right = self.cursor_position.saturating_add(1);
-        self.cursor_position = self.clamp_cursor(cursor_moved_right);
+        let cursor_moved_right = self.search_state.cursor_position.saturating_add(1);
+        self.search_state.cursor_position = self.clamp_cursor(cursor_moved_right);
     }
 
     pub fn enter_char(&mut self, new_char: char) {
-        self.search_input.insert(self.cursor_position, new_char);
+        self.search_state
+            .current_search_query
+            .insert(self.search_state.cursor_position, new_char);
 
         self.move_cursor_right();
     }
 
     pub fn paste(&mut self, data: String) {
-        self.search_input = format!("{}{}", self.search_input, data);
+        self.search_state.current_search_query =
+            format!("{}{}", self.search_state.current_search_query, data);
         for _ in 0..data.len() {
             self.move_cursor_right();
         }
     }
 
     pub fn delete_char(&mut self) {
-        let is_not_cursor_leftmost = self.cursor_position != 0;
+        let is_not_cursor_leftmost = self.search_state.cursor_position != 0;
         if is_not_cursor_leftmost {
             // Method "remove" is not used on the saved text for deleting the selected char.
             // Reason: Using remove on String works on bytes instead of the chars.
             // Using remove would require special care because of char boundaries.
 
-            let current_index = self.cursor_position;
+            let current_index = self.search_state.cursor_position;
             let from_left_to_current_index = current_index - 1;
 
             // Getting all characters before the selected character.
-            let before_char_to_delete = self.search_input.chars().take(from_left_to_current_index);
+            let before_char_to_delete = self
+                .search_state
+                .current_search_query
+                .chars()
+                .take(from_left_to_current_index);
             // Getting all characters after selected character.
-            let after_char_to_delete = self.search_input.chars().skip(current_index);
+            let after_char_to_delete = self
+                .search_state
+                .current_search_query
+                .chars()
+                .skip(current_index);
 
             // Put all characters together except the selected one.
             // By leaving the selected one out, it is forgotten and therefore deleted.
-            self.search_input = before_char_to_delete.chain(after_char_to_delete).collect();
+            self.search_state.current_search_query =
+                before_char_to_delete.chain(after_char_to_delete).collect();
             self.move_cursor_left();
         }
     }
 
     pub fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
-        new_cursor_pos.clamp(0, self.search_input.len())
+        new_cursor_pos.clamp(0, self.search_state.current_search_query.len())
     }
 
     pub fn reset_cursor(&mut self) {
-        self.cursor_position = 0;
+        self.search_state.cursor_position = 0;
     }
 
     // Send a network event to the network thread
@@ -131,16 +137,20 @@ impl App {
     }
 
     pub fn submit_search(&mut self) -> String {
-        if let Ok(name_or_address) = self.search_input.parse::<NameOrAddress>() {
+        if let Ok(name_or_address) = self
+            .search_state
+            .current_search_query
+            .parse::<NameOrAddress>()
+        {
             self.dispatch(NetworkEvent::GetENSAddressInfo {
                 name_or_address,
                 is_searching: true,
             })
         }
 
-        let message = self.search_input.to_owned();
+        let message = self.search_state.current_search_query.to_owned();
 
-        self.search_input.clear();
+        self.search_state.current_search_query.clear();
         self.reset_cursor();
         message
     }

@@ -10,20 +10,16 @@ use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
-use ethers::core::k256::sha2::digest::Key;
 use network::network::{handle_tokio, Network, NetworkEvent};
-use ratatui::backend::Backend;
-use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::widgets::{Clear, Paragraph};
 use util::constants::{GENERAL_HELP_TEXT, TICK_RATE};
 use widgets::help::render_help_popup;
 
 use crate::widgets::{
-    chart::{render_chart, TokenChart},
+    chart::TokenChart,
     search::render_search_block,
     table::{render_table, StatefulTable},
-    tabs::{render_tab_titles, TabsState},
     welcome::render_welcome,
 };
 use clap::Parser;
@@ -165,9 +161,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
 
             // Render welcome in the middle
-            let (welcome, welcome_block) = render_welcome(&mut app);
-            f.render_widget(welcome_block, chunks[1]);
-            f.render_widget(welcome, chunks[1]);
+            if let Some((
+                welcome_banner,
+                welcome_details,
+                outer_block,
+                welcome_banner_block,
+                welcome_details_block,
+            )) = render_welcome(&mut app, chunks[1])
+            {
+                f.render_widget(outer_block, chunks[1]);
+                f.render_widget(welcome_banner, welcome_banner_block);
+                f.render_widget(welcome_details, welcome_details_block);
+            }
 
             // Render table at the bottom
             f.render_stateful_widget(render_table(&table, &mut app), chunks[2], &mut table.state);
@@ -185,63 +190,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // #TODO: Move this to event handling
         match rx.recv()? {
-            Event::Input(event) => {
-                if let ActiveBlock::SearchBar = app.get_current_route().get_active_block() {
-                    match app.input_mode {
-                        InputMode::Normal => match event.code {
-                            KeyCode::Char('e') => {
-                                app.input_mode = InputMode::Editing;
-                            }
-                            KeyCode::Char('q') => {
-                                disable_raw_mode()?;
-                                terminal.clear()?;
-                                terminal.show_cursor()?;
-                                break;
-                            }
-                            KeyCode::Char('h') => {
-                                app.show_help = true;
-                            }
-                            KeyCode::Char('1') => {
-                                app.change_active_block(ActiveBlock::PositionInfo);
-                            }
-                            KeyCode::Char('2') => {
-                                app.change_active_block(ActiveBlock::MyPositions);
-                            }
-                            KeyCode::Esc => {
-                                app.show_help = false;
-                            }
-                            _ => {}
-                        },
-                        InputMode::Editing => match event.code {
-                            KeyCode::Esc => {
-                                app.input_mode = InputMode::Normal;
-                            }
-                            KeyCode::Char(c) => {
-                                app.enter_char(c);
-                            }
-                            KeyCode::Left => {
-                                app.move_cursor_left();
-                            }
-                            KeyCode::Right => {
-                                app.move_cursor_right();
-                            }
-                            KeyCode::Backspace => {
-                                app.delete_char();
-                            }
-                            KeyCode::Enter => {
-                                app.input_mode = InputMode::Normal;
-
-                                let message = app.submit_search();
-                                app.set_route(Route::new(
-                                    RouteId::Searching(message),
-                                    ActiveBlock::MyPositions,
-                                ));
-                            }
-                            _ => {}
-                        },
-                    }
-                } else {
-                    match event.code {
+            Event::Input(event) => match app.get_current_route().get_active_block() {
+                ActiveBlock::SearchBar => match app.search_state.input_mode {
+                    InputMode::Normal => match event.code {
+                        KeyCode::Char('e') => {
+                            app.search_state.input_mode = InputMode::Editing;
+                        }
                         KeyCode::Char('q') => {
                             disable_raw_mode()?;
                             terminal.clear()?;
@@ -251,28 +205,100 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         KeyCode::Char('h') => {
                             app.show_help = true;
                         }
-                        KeyCode::Char('s') => {
-                            app.change_active_block(ActiveBlock::SearchBar);
-                        }
-                        KeyCode::Esc => {
-                            app.show_help = false;
-                        }
-                        KeyCode::Up => {
-                            table.previous();
-                        }
-                        KeyCode::Down => {
-                            table.next();
-                        }
                         KeyCode::Char('1') => {
                             app.change_active_block(ActiveBlock::PositionInfo);
                         }
                         KeyCode::Char('2') => {
                             app.change_active_block(ActiveBlock::MyPositions);
                         }
+                        KeyCode::Esc => {
+                            app.show_help = false;
+                        }
                         _ => {}
+                    },
+                    InputMode::Editing => match event.code {
+                        KeyCode::Esc => {
+                            app.search_state.input_mode = InputMode::Normal;
+                        }
+                        KeyCode::Char(c) => {
+                            app.enter_char(c);
+                        }
+                        KeyCode::Left => {
+                            app.move_cursor_left();
+                        }
+                        KeyCode::Right => {
+                            app.move_cursor_right();
+                        }
+                        KeyCode::Backspace => {
+                            app.delete_char();
+                        }
+                        KeyCode::Enter => {
+                            app.search_state.input_mode = InputMode::Normal;
+
+                            let message = app.submit_search();
+                            app.set_route(Route::new(
+                                RouteId::Searching(message),
+                                ActiveBlock::MyPositions,
+                            ));
+                        }
+                        _ => {}
+                    },
+                },
+                ActiveBlock::PositionInfo => match event.code {
+                    KeyCode::Char('q') => {
+                        disable_raw_mode()?;
+                        terminal.clear()?;
+                        terminal.show_cursor()?;
+                        break;
                     }
-                }
-            }
+                    KeyCode::Char('h') => {
+                        app.show_help = true;
+                    }
+                    KeyCode::Char('s') => {
+                        app.change_active_block(ActiveBlock::SearchBar);
+                    }
+                    KeyCode::Esc => {
+                        app.show_help = false;
+                    }
+                    KeyCode::Char('1') => {
+                        app.change_active_block(ActiveBlock::PositionInfo);
+                    }
+                    KeyCode::Char('2') => {
+                        app.change_active_block(ActiveBlock::MyPositions);
+                    }
+                    _ => {}
+                },
+                ActiveBlock::MyPositions => match event.code {
+                    KeyCode::Char('q') => {
+                        disable_raw_mode()?;
+                        terminal.clear()?;
+                        terminal.show_cursor()?;
+                        break;
+                    }
+                    KeyCode::Char('h') => {
+                        app.show_help = true;
+                    }
+                    KeyCode::Char('s') => {
+                        app.change_active_block(ActiveBlock::SearchBar);
+                    }
+                    KeyCode::Esc => {
+                        app.show_help = false;
+                    }
+                    KeyCode::Up => {
+                        table.previous();
+                    }
+                    KeyCode::Down => {
+                        table.next();
+                    }
+                    KeyCode::Char('1') => {
+                        app.change_active_block(ActiveBlock::PositionInfo);
+                    }
+                    KeyCode::Char('2') => {
+                        app.change_active_block(ActiveBlock::MyPositions);
+                    }
+                    _ => {}
+                },
+            },
             Event::Tick => {
                 token_chart.update();
             }
