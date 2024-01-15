@@ -11,7 +11,7 @@ pub fn render_welcome<'a>(
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(Style::default().fg(
-            if let ActiveBlock::PositionInfo = app.get_current_route().get_active_block() {
+            if let ActiveBlock::Main = app.get_current_route().get_active_block() {
                 Color::Green
             } else {
                 Color::White

@@ -206,7 +206,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             app.show_help = true;
                         }
                         KeyCode::Char('1') => {
-                            app.change_active_block(ActiveBlock::PositionInfo);
+                            app.change_active_block(ActiveBlock::Main);
                         }
                         KeyCode::Char('2') => {
                             app.change_active_block(ActiveBlock::MyPositions);
@@ -234,17 +234,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                         KeyCode::Enter => {
                             app.search_state.input_mode = InputMode::Normal;
-
-                            let message = app.submit_search();
-                            app.set_route(Route::new(
-                                RouteId::Searching(message),
-                                ActiveBlock::MyPositions,
-                            ));
+                            app.submit_search();
                         }
                         _ => {}
                     },
                 },
-                ActiveBlock::PositionInfo => match event.code {
+                ActiveBlock::Main => match event.code {
                     KeyCode::Char('q') => {
                         disable_raw_mode()?;
                         terminal.clear()?;
@@ -259,9 +254,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     }
                     KeyCode::Esc => {
                         app.show_help = false;
-                    }
-                    KeyCode::Char('1') => {
-                        app.change_active_block(ActiveBlock::PositionInfo);
                     }
                     KeyCode::Char('2') => {
                         app.change_active_block(ActiveBlock::MyPositions);
@@ -291,7 +283,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         table.next();
                     }
                     KeyCode::Char('1') => {
-                        app.change_active_block(ActiveBlock::PositionInfo);
+                        app.change_active_block(ActiveBlock::Main);
                     }
                     KeyCode::Char('2') => {
                         app.change_active_block(ActiveBlock::MyPositions);

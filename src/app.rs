@@ -17,8 +17,6 @@ pub struct App {
     pub show_help: bool,
     /// Current route
     pub routes: Vec<Route>,
-    /// Whether the app is loading
-    pub is_loading: bool,
     /// The channel to send network events to
     pub network_txn: Option<Sender<NetworkEvent>>,
 }
@@ -30,7 +28,6 @@ impl App {
             messages: Vec::new(),
             routes: vec![Route::default()],
             show_help: false,
-            is_loading: false,
             network_txn: None,
         }
     }
@@ -125,33 +122,25 @@ impl App {
 
     // Send a network event to the network thread
     pub fn dispatch(&mut self, action: NetworkEvent) {
-        // `is_loading` will be set to false again after the async action has finished in network.rs
-        self.is_loading = true;
+        self.search_state.is_searching = true;
         if let Some(network_txn) = &self.network_txn {
             if let Err(e) = network_txn.send(action) {
-                self.is_loading = false;
+                self.search_state.is_searching = false;
                 println!("Error from dispatch {}", e);
                 //#TODO: handle network error
             };
         }
     }
 
-    pub fn submit_search(&mut self) -> String {
+    pub fn submit_search(&mut self) {
         if let Ok(name_or_address) = self
             .search_state
             .current_search_query
             .parse::<NameOrAddress>()
         {
-            self.dispatch(NetworkEvent::GetENSAddressInfo {
-                name_or_address,
-                is_searching: true,
-            })
+            self.dispatch(NetworkEvent::GetENSAddressInfo { name_or_address })
         }
 
-        let message = self.search_state.current_search_query.to_owned();
-
-        self.search_state.current_search_query.clear();
         self.reset_cursor();
-        message
     }
 }

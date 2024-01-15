@@ -1,17 +1,17 @@
-use crate::network::ethers::types::AddressInfo;
+use crate::{models::position::Position, network::ethers::types::AddressInfo};
 
 #[derive(Clone)]
 pub enum RouteId {
     Welcome,
-    Searching(String),
-    AddressInfo(Option<AddressInfo>),
+    MyPositions(Option<AddressInfo>),
+    PositionInfo(Option<Position>),
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ActiveBlock {
     SearchBar,
+    Main,
     MyPositions,
-    PositionInfo,
 }
 
 #[derive(Clone)]

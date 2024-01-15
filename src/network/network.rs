@@ -32,7 +32,6 @@ pub struct Network {
 pub enum NetworkEvent {
     GetENSAddressInfo {
         name_or_address: NameOrAddress,
-        is_searching: bool,
     },
     GetAddressPositionInfo {
         address: Address,
@@ -55,10 +54,7 @@ impl Network {
 
     pub async fn handle_event(&mut self, event: NetworkEvent) {
         match event {
-            NetworkEvent::GetENSAddressInfo {
-                name_or_address,
-                is_searching,
-            } => {
+            NetworkEvent::GetENSAddressInfo { name_or_address } => {
                 let res = match name_or_address {
                     NameOrAddress::Name(name) => {
                         Self::get_name_info(&self.etherscan_endpoint, &name).await
@@ -68,15 +64,15 @@ impl Network {
                     }
                 };
                 let mut app = self.app.lock().await;
-                if is_searching {
+                if app.search_state.is_searching {
                     app.pop_current_route();
                 }
                 app.set_route(Route::new(
-                    RouteId::AddressInfo(if let Ok(some) = res { some } else { None }),
+                    RouteId::MyPositions(if let Ok(some) = res { some } else { None }),
                     ActiveBlock::MyPositions,
                 ));
 
-                app.is_loading = false;
+                app.search_state.is_searching = false;
             }
             NetworkEvent::GetAddressPositionInfo { address, positions } => {
                 //#TODO Load positions

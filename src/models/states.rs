@@ -15,6 +15,7 @@ pub struct AppSearchState {
     pub is_invalid_search: bool,
     pub is_blank_search: bool,
     pub query: Option<Query>,
+    pub is_searching: bool,
 }
 
 impl Default for AppSearchState {
@@ -25,6 +26,7 @@ impl Default for AppSearchState {
             input_mode: InputMode::Normal,
             is_invalid_search: false,
             is_blank_search: false,
+            is_searching: false,
             query: None,
         }
     }
