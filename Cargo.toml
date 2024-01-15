@@ -6,12 +6,14 @@ edition = "2018"
 
 
 [dependencies]
+anyhow = "1.0.79"
 cfonts = "1.1.0"
 chrono = "0.4.31"
 clap = { version = "4.4.16", features = ["derive"] }
 crossterm = "0.27.0"
 ethers = "2.0.11"
 futures = "0.3.30"
+juniper = "0.15.12"
 rand = { version = "0.7.3", default-features = false, features = ["std"] }
 ratatui = "0.25.0"
 serde = "1.0.194"

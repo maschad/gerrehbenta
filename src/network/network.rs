@@ -1,7 +1,5 @@
-use std::{
-    error::Error,
-    sync::{mpsc::Receiver, Arc},
-};
+use anyhow::Result;
+use std::sync::{mpsc::Receiver, Arc};
 
 use super::ethers::types::AddressInfo;
 use crate::{
@@ -67,10 +65,16 @@ impl Network {
                 if app.search_state.is_searching {
                     app.pop_current_route();
                 }
-                app.set_route(Route::new(
-                    RouteId::MyPositions(if let Ok(some) = res { some } else { None }),
-                    ActiveBlock::MyPositions,
-                ));
+
+                // if let Ok(Some(address_info)) = res {}
+                // app.set_route(Route::new(
+                //     RouteId::MyPositions(if let Ok(some) = position_res {
+                //         some
+                //     } else {
+                //         None
+                //     }),
+                //     ActiveBlock::MyPositions,
+                // ));
 
                 app.search_state.is_searching = false;
             }
@@ -80,10 +84,7 @@ impl Network {
         }
     }
 
-    async fn get_name_info(
-        endpoint: &str,
-        ens_id: &str,
-    ) -> Result<Option<AddressInfo>, Box<dyn Error>> {
+    async fn get_name_info(endpoint: &str, ens_id: &str) -> Result<Option<AddressInfo>> {
         let provider = Provider::<Http>::try_from(endpoint)?;
         let address = provider.resolve_name(&ens_id).await?;
 
@@ -98,10 +99,7 @@ impl Network {
         }))
     }
 
-    async fn get_address_info(
-        endpoint: &str,
-        address: Address,
-    ) -> Result<Option<AddressInfo>, Box<dyn Error>> {
+    async fn get_address_info(endpoint: &str, address: Address) -> Result<Option<AddressInfo>> {
         let provider = Provider::<Http>::try_from(endpoint)?;
         let ens_id = provider.lookup_address(address).await.ok();
 
@@ -113,6 +111,16 @@ impl Network {
             ens_id,
         }))
     }
+
+    // async fn get_uniswap_v3_positions(
+    //     endpoint: &str,
+    //     address: Address,
+    // ) -> Result<Option<Vec<Position>>> {
+    //     let provider = Provider::<Http>::try_from(endpoint)?;
+    //     let positions = provider.await?;
+
+    //     Ok(Some(positions))
+    // }
 }
 
 #[tokio::main]

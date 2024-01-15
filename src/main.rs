@@ -22,6 +22,7 @@ use crate::widgets::{
     table::{render_table, StatefulTable},
     welcome::render_welcome,
 };
+use anyhow::Result;
 use clap::Parser;
 use models::event_handling::Event;
 use models::states::InputMode;
@@ -60,7 +61,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     let _ = std::fs::create_dir("logs");
 
     CombinedLogger::init(vec![
