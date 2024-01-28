@@ -1,11 +1,47 @@
+use std::collections::HashMap;
+
+use ethers::types::Address;
+use juniper::{graphql_object, Context};
+
+use crate::network::ethers::types::AddressInfo;
+
+use super::position::Position;
+
 pub enum InputMode {
     Normal,
     Editing,
 }
 
-pub struct Query {
-    pub query: String,
-    pub error_message: Option<String>,
+#[derive(Clone, Default)]
+pub struct Database {
+    pub positions: HashMap<String, Position>,
+}
+
+impl Context for Database {}
+
+impl Database {
+    pub fn default() -> Database {
+        let mut positions = HashMap::<String, Position>::new();
+
+        Database { positions }
+    }
+
+    pub fn get_position(&self, address: &str) -> Option<&Position> {
+        self.positions.get(address)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Query;
+
+#[graphql_object(context = Database)]
+impl Query {
+    fn position(
+        #[graphql(context)] database: &Database,
+        #[graphql(description = "Address of a position")] address: String,
+    ) -> Option<&Position> {
+        database.get_position(&address)
+    }
 }
 
 pub struct AppSearchState {

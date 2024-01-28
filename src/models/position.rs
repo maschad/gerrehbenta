@@ -65,12 +65,12 @@ impl<S> GraphQLScalar for I128
 where
     S: ScalarValue,
 {
-    // Convert I128 to juniper::Value
+    // Convert I128 to Value
     fn resolve(&self) -> Value {
         Value::scalar(self.0.to_string())
     }
 
-    // Convert juniper::InputValue to MyI128
+    // Convert juniper::InputValue to I128
     fn from_input_value(v: &InputValue) -> Option<I128> {
         v.as_string_value()
             .and_then(|s| s.parse::<i128>().ok())

@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::io::{self};
 use std::sync::{mpsc, Arc};
 use std::thread;
