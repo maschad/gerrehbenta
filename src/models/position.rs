@@ -1,4 +1,4 @@
-use juniper::{graphql_scalar, GraphQLObject, ParseScalarResult, ParseScalarValue, Value};
+use juniper::GraphQLObject;
 
 /** Query for active liquidity positions
  * {
@@ -55,34 +55,6 @@ pub struct Transaction {
     timestamp: i32,
 }
 
-/// A signed 128-bit integer
-#[derive(Debug, Clone, Copy)]
-pub struct I128(i128);
-
-// Implement GraphQLScalar for I128
-#[graphql_scalar(name = "I128", description = "i128 custom scalar")]
-impl<S> GraphQLScalar for I128
-where
-    S: ScalarValue,
-{
-    // Convert I128 to Value
-    fn resolve(&self) -> Value {
-        Value::scalar(self.0.to_string())
-    }
-
-    // Convert juniper::InputValue to I128
-    fn from_input_value(v: &InputValue) -> Option<I128> {
-        v.as_string_value()
-            .and_then(|s| s.parse::<i128>().ok())
-            .map(I128)
-    }
-
-    // Parse literal values from GraphQL query
-    fn from_str<'a>(value: ScalarToken<'a>) -> ParseScalarResult<'a, S> {
-        <String as ParseScalarValue<S>>::from_str(value)
-    }
-}
-
 #[derive(Debug, Clone, GraphQLObject)]
 #[graphql(description = "Information about a Uniswap pool")]
 pub struct Pool {
@@ -90,15 +62,15 @@ pub struct Pool {
     token_1_price: i32,
     volume_token_0: i32,
     volume_token_1: i32,
-    fee_growth_global_0_x128: I128,
-    fee_growth_global_1_x128: I128,
+    fee_growth_global_0_x128: String,
+    fee_growth_global_1_x128: String,
 }
 
 #[derive(Debug, Clone, GraphQLObject)]
 #[graphql(description = "Information about a Uniswap tick")]
 pub struct Tick {
-    fee_growth_outside_0_x128: I128,
-    fee_growth_outside_1_x128: I128,
+    fee_growth_outside_0_x128: String,
+    fee_growth_outside_1_x128: String,
 }
 #[derive(Debug, Clone, GraphQLObject)]
 #[graphql(description = "Information about a Uniswap position")]
@@ -106,8 +78,8 @@ pub struct Position {
     token_0: Token,
     token_1: Token,
     pool: Pool,
-    fee_growth_inside_0_last_x128: I128,
-    fee_growth_inside_1_last_x128: I128,
+    fee_growth_inside_0_last_x128: String,
+    fee_growth_inside_1_last_x128: String,
     tick_lower: Tick,
     tick_upper: Tick,
     withdrawn_token_0: i32,

@@ -27,7 +27,7 @@ impl<'a> TabsState<'a> {
 }
 pub fn render_tab_blocks<'a>(tabs: &TabsState<'a>) -> Tabs<'a> {
     // Tabs
-    let titles = tabs
+    let titles: Vec<Vec<Span<'a>>> = tabs
         .titles
         .iter()
         .map(|t| {
