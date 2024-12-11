@@ -15,10 +15,10 @@ use crossterm::{
 use human_panic::{metadata, setup_panic, Metadata};
 use lazy_static::lazy_static;
 
+use log::debug;
 use parking_lot::{Mutex, RwLock};
 
 use network::network::{handle_tokio, Network, NetworkEvent};
-use ratatui::style::{Color, Style};
 use ratatui::widgets::{Clear, Paragraph};
 use util::constants::{GENERAL_HELP_TEXT, TICK_RATE};
 
@@ -49,6 +49,7 @@ mod models;
 mod network;
 mod render;
 mod routes;
+mod theme;
 mod util;
 mod widgets;
 
@@ -77,7 +78,6 @@ struct Args {
 lazy_static! {
     pub static ref REDRAW_REQUEST: (Sender<()>, Receiver<()>) = bounded(1);
     pub static ref DATA_RECEIVED: (Sender<()>, Receiver<()>) = bounded(1);
-    // pub static ref OPTS: opts::Opts = opts::resolve_opts();
 }
 
 #[tokio::main]
@@ -85,64 +85,49 @@ async fn main() -> Result<()> {
     setup_panic!();
     setup_panic_hook();
     setup_terminal();
+    setup_logger();
 
-    let _ = std::fs::create_dir("logs");
+    debug!("Application starting up");
 
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            LevelFilter::Error,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Debug,
-            Config::default(),
-            std::fs::File::create(format!("logs/{}.log", Utc::now().format("%Y%m%d%H%M"))).unwrap(),
-        ),
-    ])
-    .unwrap();
+    let backend = CrosstermBackend::new(io::stdout());
+    let mut terminal = Terminal::new(backend).unwrap();
 
-    enable_raw_mode().expect("can run in raw mode");
-
-    let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(TICK_RATE);
 
     let request_redraw = REDRAW_REQUEST.0.clone();
     let data_received = DATA_RECEIVED.1.clone();
     let ui_events = setup_ui_events();
 
-    let backend = CrosstermBackend::new(io::stdout());
-    let mut terminal = Terminal::new(backend).unwrap();
-
     // let opts = OPTS.clone();
 
-    // Start tick thread
+    // #TODO: Store starting mode locally
+    let app = Arc::new(Mutex::new(App::default()));
+    let cloned_app = app.clone();
+
     thread::spawn(move || {
-        let mut last_tick = Instant::now();
+        let app = cloned_app;
+        let redraw_requested = REDRAW_REQUEST.1.clone();
+
+        debug!("Starting UI thread");
+
         loop {
-            let timeout = tick_rate
-                .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
+            select! {
+                recv(redraw_requested) -> _ => {
+                    let mut app = app.lock();
 
-            if event::poll(timeout).expect("poll works") {
-                if let CEvent::Key(key) = event::read().expect("can read events") {
-                    tx.send(Event::Input(key)).expect("can send events");
+                    render::draw(&mut terminal, &mut app);
                 }
-            }
-
-            if last_tick.elapsed() >= tick_rate {
-                if let Ok(_) = tx.send(Event::Tick) {
-                    last_tick = Instant::now();
+                // Default redraw on every duration
+                default(tick_rate) => {
+                    let mut app = app.lock();
+                    render::draw(&mut terminal, &mut app);
                 }
             }
         }
     });
 
-    // #TODO: Store starting mode locally
-    let app = Arc::new(Mutex::new(App::default()));
     let cloned_app = app.clone();
-    let args = Args::parse();
+    let args: Args = Args::parse();
     let (_, sync_network_rx) = mpsc::channel::<NetworkEvent>();
 
     // Start network thread
@@ -154,28 +139,6 @@ async fn main() -> Result<()> {
             args.uniswap_limits_endpoint,
         );
         handle_tokio(sync_network_rx, &mut network);
-    });
-
-    let cloned_app = app.clone();
-
-    thread::spawn(move || {
-        let app = cloned_app;
-
-        let redraw_requested = REDRAW_REQUEST.1.clone();
-        loop {
-            select! {
-                recv(redraw_requested) -> _ => {
-                    let mut app = app.lock();
-
-                    render::draw(&mut terminal, &mut app);
-                }
-                // Default redraw on every duration
-                default(Duration::from_millis(500)) => {
-                    let mut app = app.lock();
-                    render::draw(&mut terminal, &mut app);
-                }
-            }
-        }
     });
 
     loop {
@@ -204,6 +167,25 @@ async fn main() -> Result<()> {
     }
 }
 
+fn setup_logger() {
+    let _ = std::fs::create_dir("logs");
+
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Error,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Debug,
+            Config::default(),
+            std::fs::File::create(format!("logs/{}.log", Utc::now().format("%Y%m%d%H%M"))).unwrap(),
+        ),
+    ])
+    .unwrap();
+}
+
 fn setup_terminal() {
     let mut stdout = io::stdout();
 
@@ -228,6 +210,7 @@ fn cleanup_terminal() {
 }
 
 fn setup_ui_events() -> Receiver<CEvent> {
+    debug!("Setting up UI events");
     let (sender, receiver) = unbounded();
     std::thread::spawn(move || loop {
         sender.send(crossterm::event::read().unwrap()).unwrap();

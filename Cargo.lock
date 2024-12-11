@@ -1541,6 +1541,7 @@ dependencies = [
  "hyper 1.5.1",
  "juniper",
  "lazy_static",
+ "log",
  "parking_lot",
  "rand",
  "ratatui",

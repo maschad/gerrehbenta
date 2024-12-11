@@ -1,3 +1,4 @@
+use log::debug;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     prelude::Backend,
@@ -7,7 +8,7 @@ use ratatui::{
 
 use crate::{
     app::{App, Mode},
-    widgets::tabs,
+    widgets::{tabs, welcome::render_welcome},
 };
 
 pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) {
@@ -19,15 +20,19 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) {
 
     terminal
         .draw(|frame| {
+            debug!("Drawing UI frame");
+
             // Set background color
             frame.render_widget(Block::default(), frame.area());
 
-            if app.mode == Mode::LimitOrders {
-                // layout[0] - Main window
-                // layout[1] - Add Stock window
+            if app.mode == Mode::Welcome {
                 let layout = Layout::default()
                     .constraints([Constraint::Min(0), Constraint::Length(3)].as_ref())
                     .split(frame.area());
+
+                let (banner, details, banner_block, details_block) = render_welcome(layout[0]);
+                frame.render_widget(banner, banner_block);
+                frame.render_widget(details, details_block);
             }
         })
         .unwrap();
