@@ -11,9 +11,9 @@ use ethers::{
     core::types::{Address, NameOrAddress},
     providers::{Http, Middleware, Provider},
 };
+use parking_lot::{Mutex, RwLock};
 use serde::Deserialize;
 use std::convert::TryFrom;
-use tokio::sync::Mutex;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Etherscan {
@@ -24,6 +24,7 @@ pub struct Etherscan {
 pub struct Network {
     uniswap_v3_endpoint: String,
     etherscan_endpoint: String,
+    uniswap_limits_endpoint: String,
     app: Arc<Mutex<App>>,
 }
 
@@ -42,10 +43,12 @@ impl Network {
         app: Arc<Mutex<App>>,
         etherscan_endpoint: String,
         uniswap_v3_endpoint: String,
+        uniswap_limits_endpoint: String,
     ) -> Self {
         Self {
             etherscan_endpoint,
             uniswap_v3_endpoint,
+            uniswap_limits_endpoint,
             app,
         }
     }
@@ -61,7 +64,7 @@ impl Network {
                         Self::get_address_info(&self.etherscan_endpoint, address).await
                     }
                 };
-                let mut app = self.app.lock().await;
+                let mut app = self.app.lock();
                 if app.search_state.is_searching {
                     app.pop_current_route();
                 }

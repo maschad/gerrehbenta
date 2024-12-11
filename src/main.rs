@@ -1,19 +1,26 @@
 use std::io::{self};
 use std::sync::{mpsc, Arc};
-use std::thread;
 use std::time::{Duration, Instant};
+use std::{panic, thread};
 
-use app::App;
+use app::{App, Mode};
 use chrono::Utc;
+use crossbeam_channel::{bounded, select, unbounded, Receiver, Sender};
+use crossterm::{cursor, execute, terminal};
 use crossterm::{
     event::{self, Event as CEvent, KeyCode},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
+
+use human_panic::{metadata, setup_panic, Metadata};
+use lazy_static::lazy_static;
+
+use parking_lot::{Mutex, RwLock};
+
 use network::network::{handle_tokio, Network, NetworkEvent};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::{Clear, Paragraph};
 use util::constants::{GENERAL_HELP_TEXT, TICK_RATE};
-use widgets::help::render_help_popup;
 
 use crate::widgets::{
     chart::TokenChart,
@@ -35,11 +42,12 @@ use routes::{ActiveBlock, Route, RouteId};
 use simplelog::{
     ColorChoice, CombinedLogger, Config, LevelFilter, TermLogger, TerminalMode, WriteLogger,
 };
-use tokio::sync::Mutex;
 
 mod app;
+mod event_handling;
 mod models;
 mod network;
+mod render;
 mod routes;
 mod util;
 mod widgets;
@@ -57,10 +65,27 @@ struct Args {
         default_value = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3/graphql"
     )]
     uniswap_v3_endpoint: String,
+    // Uniswap limits endpoint
+    #[arg(
+        short,
+        long,
+        default_value = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3/graphql"
+    )]
+    uniswap_limits_endpoint: String,
+}
+
+lazy_static! {
+    pub static ref REDRAW_REQUEST: (Sender<()>, Receiver<()>) = bounded(1);
+    pub static ref DATA_RECEIVED: (Sender<()>, Receiver<()>) = bounded(1);
+    // pub static ref OPTS: opts::Opts = opts::resolve_opts();
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    setup_panic!();
+    setup_panic_hook();
+    setup_terminal();
+
     let _ = std::fs::create_dir("logs");
 
     CombinedLogger::init(vec![
@@ -82,6 +107,15 @@ async fn main() -> Result<()> {
 
     let (tx, rx) = mpsc::channel();
     let tick_rate = Duration::from_millis(TICK_RATE);
+
+    let request_redraw = REDRAW_REQUEST.0.clone();
+    let data_received = DATA_RECEIVED.1.clone();
+    let ui_events = setup_ui_events();
+
+    let backend = CrosstermBackend::new(io::stdout());
+    let mut terminal = Terminal::new(backend).unwrap();
+
+    // let opts = OPTS.clone();
 
     // Start tick thread
     thread::spawn(move || {
@@ -105,197 +139,109 @@ async fn main() -> Result<()> {
         }
     });
 
+    // #TODO: Store starting mode locally
     let app = Arc::new(Mutex::new(App::default()));
     let cloned_app = app.clone();
     let args = Args::parse();
-    let (sync_network_tx, sync_network_rx) = mpsc::channel::<NetworkEvent>();
+    let (_, sync_network_rx) = mpsc::channel::<NetworkEvent>();
 
     // Start network thread
-    std::thread::spawn(move || {
-        let mut network = Network::default(app, args.etherscan_endpoint, args.uniswap_v3_endpoint);
+    thread::spawn(move || {
+        let mut network = Network::default(
+            cloned_app,
+            args.etherscan_endpoint,
+            args.uniswap_v3_endpoint,
+            args.uniswap_limits_endpoint,
+        );
         handle_tokio(sync_network_rx, &mut network);
     });
 
-    let stdout = io::stdout();
-    let stdout = stdout.lock();
-    let backend = CrosstermBackend::new(stdout);
+    let cloned_app = app.clone();
 
-    let mut app = cloned_app.lock().await;
-    let mut terminal = Terminal::new(backend)?;
-    let mut table = StatefulTable::new();
-    let mut token_chart = TokenChart::new();
+    thread::spawn(move || {
+        let app = cloned_app;
 
-    terminal.clear()?;
+        let redraw_requested = REDRAW_REQUEST.1.clone();
+        loop {
+            select! {
+                recv(redraw_requested) -> _ => {
+                    let mut app = app.lock();
+
+                    render::draw(&mut terminal, &mut app);
+                }
+                // Default redraw on every duration
+                default(Duration::from_millis(500)) => {
+                    let mut app = app.lock();
+                    render::draw(&mut terminal, &mut app);
+                }
+            }
+        }
+    });
 
     loop {
-        terminal.draw(|f| {
-            // Wrapping block for a group
-            // Just draw the block and the group on the same area and build the group
-            // with at least a margin of 1
-            let size = f.size();
+        select! {
+            // Notified that new data has been fetched from API, update widgets
+            // so they can update their state with this new information
+            recv(data_received) -> _ => {
+                let mut app = app.lock();
 
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(
-                    [
-                        Constraint::Percentage(10),
-                        Constraint::Percentage(40),
-                        Constraint::Percentage(40),
-                        Constraint::Percentage(10),
-                    ]
-                    .as_ref(),
-                )
-                .margin(1)
-                .split(f.size());
-
-            if app.show_help {
-                let (help, help_block, help_area) = render_help_popup(size);
-                f.render_widget(Clear, help_area); //this clears out the background
-                f.render_widget(help_block, help_area);
-                f.render_widget(help, help_area);
+                app.update();
             }
+            recv(ui_events) -> message => {
+                let mut app = app.lock();
 
-            if let Some((search_bar, search_bar_rect)) = render_search_block(chunks[0], &mut app) {
-                // Render search bar at the stop
-                f.render_widget(search_bar, search_bar_rect);
-            }
-
-            // Render welcome in the middle
-            if let Some((
-                welcome_banner,
-                welcome_details,
-                outer_block,
-                welcome_banner_block,
-                welcome_details_block,
-            )) = render_welcome(&mut app, chunks[1])
-            {
-                f.render_widget(outer_block, chunks[1]);
-                f.render_widget(welcome_banner, welcome_banner_block);
-                f.render_widget(welcome_details, welcome_details_block);
-            }
-
-            // Render table at the bottom
-            f.render_stateful_widget(render_table(&table, &mut app), chunks[2], &mut table.state);
-
-            //Render the help text at the bottom
-            let help_text = Paragraph::new(GENERAL_HELP_TEXT)
-                .style(Style::default().fg(Color::White))
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_type(BorderType::Plain),
-                );
-            f.render_widget(help_text, chunks[3]);
-        })?;
-
-        // #TODO: Move this to event handling
-        match rx.recv()? {
-            Event::Input(event) => match app.get_current_route().get_active_block() {
-                ActiveBlock::SearchBar => match app.search_state.input_mode {
-                    InputMode::Normal => match event.code {
-                        KeyCode::Char('e') => {
-                            app.search_state.input_mode = InputMode::Editing;
-                        }
-                        KeyCode::Char('q') => {
-                            disable_raw_mode()?;
-                            terminal.clear()?;
-                            terminal.show_cursor()?;
-                            break;
-                        }
-                        KeyCode::Char('h') => {
-                            app.show_help = true;
-                        }
-                        KeyCode::Char('1') => {
-                            app.change_active_block(ActiveBlock::Main);
-                        }
-                        KeyCode::Char('2') => {
-                            app.change_active_block(ActiveBlock::MyPositions);
-                        }
-                        KeyCode::Esc => {
-                            app.show_help = false;
-                        }
-                        _ => {}
-                    },
-                    InputMode::Editing => match event.code {
-                        KeyCode::Esc => {
-                            app.search_state.input_mode = InputMode::Normal;
-                        }
-                        KeyCode::Char(c) => {
-                            app.enter_char(c);
-                        }
-                        KeyCode::Left => {
-                            app.move_cursor_left();
-                        }
-                        KeyCode::Right => {
-                            app.move_cursor_right();
-                        }
-                        KeyCode::Backspace => {
-                            app.delete_char();
-                        }
-                        KeyCode::Enter => {
-                            app.search_state.input_mode = InputMode::Normal;
-                            app.submit_search();
-                        }
-                        _ => {}
-                    },
-                },
-                ActiveBlock::Main => match event.code {
-                    KeyCode::Char('q') => {
-                        disable_raw_mode()?;
-                        terminal.clear()?;
-                        terminal.show_cursor()?;
-                        break;
+                match message {
+                    Ok(CEvent::Key(key_event)) => {
+                        event_handling::handle_key_bindings(app.mode, key_event, &mut app, &request_redraw);
                     }
-                    KeyCode::Char('h') => {
-                        app.show_help = true;
-                    }
-                    KeyCode::Char('s') => {
-                        app.change_active_block(ActiveBlock::SearchBar);
-                    }
-                    KeyCode::Esc => {
-                        app.show_help = false;
-                    }
-                    KeyCode::Char('2') => {
-                        app.change_active_block(ActiveBlock::MyPositions);
+                    Ok(CEvent::Resize(..)) => {
+                        let _ = request_redraw.try_send(());
                     }
                     _ => {}
-                },
-                ActiveBlock::MyPositions => match event.code {
-                    KeyCode::Char('q') => {
-                        disable_raw_mode()?;
-                        terminal.clear()?;
-                        terminal.show_cursor()?;
-                        break;
-                    }
-                    KeyCode::Char('h') => {
-                        app.show_help = true;
-                    }
-                    KeyCode::Char('s') => {
-                        app.change_active_block(ActiveBlock::SearchBar);
-                    }
-                    KeyCode::Esc => {
-                        app.show_help = false;
-                    }
-                    KeyCode::Up => {
-                        table.previous();
-                    }
-                    KeyCode::Down => {
-                        table.next();
-                    }
-                    KeyCode::Char('1') => {
-                        app.change_active_block(ActiveBlock::Main);
-                    }
-                    KeyCode::Char('2') => {
-                        app.change_active_block(ActiveBlock::MyPositions);
-                    }
-                    _ => {}
-                },
-            },
-            Event::Tick => {
-                token_chart.update();
+                }
             }
         }
     }
+}
 
-    Ok(())
+fn setup_terminal() {
+    let mut stdout = io::stdout();
+
+    execute!(stdout, cursor::Hide).unwrap();
+    execute!(stdout, terminal::EnterAlternateScreen).unwrap();
+
+    execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
+
+    terminal::enable_raw_mode().unwrap();
+}
+
+fn cleanup_terminal() {
+    let mut stdout = io::stdout();
+
+    execute!(stdout, cursor::MoveTo(0, 0)).unwrap();
+    execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
+
+    execute!(stdout, terminal::LeaveAlternateScreen).unwrap();
+    execute!(stdout, cursor::Show).unwrap();
+
+    terminal::disable_raw_mode().unwrap();
+}
+
+fn setup_ui_events() -> Receiver<CEvent> {
+    let (sender, receiver) = unbounded();
+    std::thread::spawn(move || loop {
+        sender.send(crossterm::event::read().unwrap()).unwrap();
+    });
+
+    receiver
+}
+
+fn setup_panic_hook() {
+    panic::set_hook(Box::new(|panic_info| {
+        cleanup_terminal();
+        human_panic::handle_dump(
+            &Metadata::new(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")),
+            panic_info,
+        );
+    }));
 }

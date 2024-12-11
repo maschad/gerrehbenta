@@ -40,13 +40,17 @@ pub fn render_welcome<'a>(
 
     let details = Paragraph::new(vec![
         Line::from(
+            Span::raw(format!("   {:<13}", "A CLI tool for querying Uniswap info",))
+                .fg(Color::White),
+        ),
+        Line::from(
             Span::raw(format!(
-                "   {:<13}",
-                "A CLI for managing your Uniswap liquidity positions",
+                "   {:<13}: {}",
+                "Version",
+                env!("CARGO_PKG_VERSION")
             ))
             .fg(Color::White),
         ),
-        Line::from(Span::raw(format!("   {:<13}: {}", "Version", "v0.1.0")).fg(Color::White)),
     ])
     .block(Block::default())
     .alignment(Alignment::Center);

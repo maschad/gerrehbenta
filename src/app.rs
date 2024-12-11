@@ -9,6 +9,10 @@ use crate::{
 
 // App holds the state of the application
 pub struct App {
+    /// Current mode
+    pub mode: Mode,
+    /// Previous mode
+    pub previous_mode: Mode,
     /// Current input mode
     pub search_state: AppSearchState,
     /// History of recorded messages
@@ -20,16 +24,33 @@ pub struct App {
     /// The channel to send network events to
     pub network_txn: Option<Sender<NetworkEvent>>,
 }
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+
+pub enum Mode {
+    Welcome,
+    Main,
+    Help,
+    Search,
+    LimitOrders,
+    PoolInfo,
+    MyPositions,
+}
 
 impl App {
     pub fn default() -> App {
         App {
+            previous_mode: Mode::Welcome,
+            mode: Mode::Welcome,
             search_state: AppSearchState::default(),
             messages: Vec::new(),
             routes: vec![Route::default()],
             show_help: false,
             network_txn: None,
         }
+    }
+
+    pub fn update(&mut self) {
+        // #TODO: Add update logic
     }
 
     pub fn pop_current_route(&mut self) {
