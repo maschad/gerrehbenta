@@ -5,6 +5,7 @@ pub enum RouteId {
     Welcome,
     MyPositions(Option<AddressInfo>),
     PositionInfo(Option<Position>),
+    LimitOrders,
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -12,6 +13,7 @@ pub enum ActiveBlock {
     SearchBar,
     Main,
     MyPositions,
+    LimitOrders,
 }
 
 #[derive(Clone)]

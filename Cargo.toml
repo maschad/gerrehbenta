@@ -4,26 +4,30 @@ version = "1.0.0"
 authors = ["Chad Nehemiah <chad.nehemiah94@gmail.com>"]
 edition = "2021"
 
+[lints.rust]
+warnings = "allow"
 
 [dependencies]
-anyhow = "1.0.94"
-bytes = "1.9.0"
+anyhow = "1.0.98"
+bytes = "1.10.1"
 cfonts = "1.2.0"
-chrono = "0.4.39"
-clap = { version = "4.5.23", features = ["derive"] }
-crossterm = "0.28.1"
+chrono = "0.4.41"
+clap = { version = "4.5.37", features = ["derive"] }
+crossterm = "0.29.0"
 crossbeam-channel = "0.5.13"
 ethers = { version = "2.0.14" }
 parking_lot = "0.12.3"
 futures = "0.3.31"
-hyper = "1.5.1"
+hyper = "1.6.0"
 juniper = "0.16.1"
-rand = { version = "0.8.5", default-features = false, features = ["std"] }
+rand = { version = "0.9.1", default-features = false, features = ["std"] }
 ratatui = "0.29.0"
-serde = "1.0.215"
+reqwest = { version = "0.12.15", features = ["json"] }
+serde = "1.0.219"
+serde_json = "1.0.140"
 simplelog = "0.12.2"
-tokio = { version = "1.42.0", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
 url = "2.5.4"
 human-panic = "2.0.2"
 lazy_static = "1.5.0"
-log = "0.4.22"
+log = "0.4.27"

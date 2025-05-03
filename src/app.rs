@@ -3,6 +3,7 @@ use std::sync::mpsc::Sender;
 
 use crate::{
     models::states::AppSearchState,
+    network::limit_orders::LimitOrder,
     network::network::NetworkEvent,
     routes::{ActiveBlock, Route},
 };
@@ -23,6 +24,8 @@ pub struct App {
     pub routes: Vec<Route>,
     /// The channel to send network events to
     pub network_txn: Option<Sender<NetworkEvent>>,
+    /// Current limit orders
+    pub limit_orders: Vec<LimitOrder>,
 }
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 
@@ -46,11 +49,16 @@ impl App {
             routes: vec![Route::default()],
             show_help: false,
             network_txn: None,
+            limit_orders: Vec::new(),
         }
     }
 
     pub fn update(&mut self) {
         // #TODO: Add update logic
+    }
+
+    pub fn update_limit_orders(&mut self, orders: Vec<LimitOrder>) {
+        self.limit_orders = orders;
     }
 
     pub fn pop_current_route(&mut self) {

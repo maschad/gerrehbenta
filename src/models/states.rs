@@ -4,6 +4,7 @@ use ethers::types::Address;
 use juniper::{graphql_object, Context};
 
 use crate::network::ethers::types::AddressInfo;
+use crate::widgets::enter_ens::EnterEnsState;
 
 use super::position::Position;
 
@@ -52,6 +53,7 @@ pub struct AppSearchState {
     pub is_blank_search: bool,
     pub query: Option<Query>,
     pub is_searching: bool,
+    pub ens_state: EnterEnsState,
 }
 
 impl Default for AppSearchState {
@@ -64,6 +66,7 @@ impl Default for AppSearchState {
             is_blank_search: false,
             is_searching: false,
             query: None,
+            ens_state: EnterEnsState::new(),
         }
     }
 }

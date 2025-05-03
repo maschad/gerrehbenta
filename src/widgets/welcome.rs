@@ -1,19 +1,38 @@
 use log::debug;
 use ratatui::{prelude::*, widgets::*};
 
+use super::enter_ens::{EnterEnsState, EnterEnsWidget};
 use crate::{app::App, routes::ActiveBlock};
 
-pub fn render_welcome<'a>(rect: Rect) -> (Paragraph<'a>, Paragraph<'a>, Rect, Rect) {
+pub fn render_welcome<'a>(
+    rect: Rect,
+) -> (
+    Paragraph<'a>,
+    Paragraph<'a>,
+    EnterEnsWidget,
+    Rect,
+    Rect,
+    Rect,
+    Paragraph<'a>,
+) {
     debug!("Rendering welcome");
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Ratio(1, 3), Constraint::Ratio(2, 3)].as_ref())
+        .constraints(
+            [
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ]
+            .as_ref(),
+        )
         .margin(1)
         .split(rect);
 
     let banner_block = chunks[0];
     let details_block = chunks[1];
+    let ens_block = chunks[2];
 
     let banner = Paragraph::new(Text::from(
         cfonts::render(cfonts::Options {
@@ -31,17 +50,29 @@ pub fn render_welcome<'a>(rect: Rect) -> (Paragraph<'a>, Paragraph<'a>, Rect, Re
             Span::raw(format!("   {:<13}", "A CLI tool for querying Uniswap info",))
                 .fg(Color::White),
         ),
+        Line::from(Span::raw(format!("{:<13}: {}", "Author", "Chad Nehemiah")).fg(Color::White)),
         Line::from(
-            Span::raw(format!(
-                "   {:<13}: {}",
-                "Version",
-                env!("CARGO_PKG_VERSION")
-            ))
-            .fg(Color::White),
+            Span::raw(format!(" {:<13}: {}", "Version", env!("CARGO_PKG_VERSION")))
+                .fg(Color::White),
         ),
     ])
     .block(Block::default())
     .alignment(Alignment::Center);
 
-    (banner, details, banner_block, details_block)
+    // Create a message prompting the user to enter their ETH wallet or ENS
+    let prompt_message = Paragraph::new("Please enter your ETH wallet or ENS")
+        .alignment(Alignment::Center)
+        .block(Block::default());
+
+    let ens_widget = EnterEnsWidget {};
+
+    (
+        banner,
+        details,
+        ens_widget,
+        banner_block,
+        details_block,
+        ens_block,
+        prompt_message,
+    )
 }
