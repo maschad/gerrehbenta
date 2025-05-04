@@ -2,9 +2,8 @@ use ethers::types::NameOrAddress;
 use std::sync::mpsc::Sender;
 
 use crate::{
-    models::states::AppSearchState,
-    network::limit_orders::LimitOrder,
-    network::network::NetworkEvent,
+    models::{position::Position, states::AppSearchState},
+    network::{limit_orders::LimitOrder, network::NetworkEvent},
     routes::{ActiveBlock, Route},
 };
 
@@ -16,8 +15,8 @@ pub struct App {
     pub previous_mode: Mode,
     /// Current input mode
     pub search_state: AppSearchState,
-    /// Current ens address
-    pub ens_address: Option<String>,
+    /// Current wallet address
+    pub wallet_address: Option<String>,
     /// whether to show help dialogue
     pub show_help: bool,
     /// Current route
@@ -26,9 +25,11 @@ pub struct App {
     pub network_txn: Option<Sender<NetworkEvent>>,
     /// Current limit orders
     pub limit_orders: Vec<LimitOrder>,
+    /// Current positions
+    pub positions: Vec<Position>,
 }
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
     Welcome,
     Main,
@@ -45,11 +46,12 @@ impl App {
             previous_mode: Mode::Welcome,
             mode: Mode::Welcome,
             search_state: AppSearchState::default(),
-            ens_address: None,
+            wallet_address: None,
             routes: vec![Route::default()],
             show_help: false,
             network_txn: None,
             limit_orders: Vec::new(),
+            positions: Vec::new(),
         }
     }
 

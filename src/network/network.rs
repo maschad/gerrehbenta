@@ -6,7 +6,9 @@ use super::limit_orders::{fetch_limit_orders, LimitOrder};
 use crate::{
     app::App,
     models::position::Position,
+    network::server::fetch_positions,
     routes::{ActiveBlock, Route, RouteId},
+    widgets::chart::TokenChart,
 };
 use ethers::{
     core::types::{Address, NameOrAddress},
@@ -15,20 +17,14 @@ use ethers::{
 use parking_lot::{Mutex, RwLock};
 use serde::Deserialize;
 use std::convert::TryFrom;
+use std::sync::mpsc::Sender;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Etherscan {
     api_key: Option<String>,
 }
 
-#[derive(Clone)]
-pub struct Network {
-    uniswap_v3_endpoint: String,
-    etherscan_endpoint: String,
-    uniswap_limits_endpoint: String,
-    app: Arc<Mutex<App>>,
-}
-
+#[derive(Debug)]
 pub enum NetworkEvent {
     GetENSAddressInfo {
         name_or_address: NameOrAddress,
@@ -38,6 +34,13 @@ pub enum NetworkEvent {
         positions: Option<Vec<Position>>,
     },
     FetchLimitOrders,
+}
+
+pub struct Network {
+    uniswap_v3_endpoint: String,
+    etherscan_endpoint: String,
+    uniswap_limits_endpoint: String,
+    app: Arc<Mutex<App>>,
 }
 
 impl Network {
@@ -89,7 +92,15 @@ impl Network {
 
                 // Set up the UI to display the address information
                 app.search_state.is_searching = false;
-                app.ens_address = Some(address_info.address.to_string());
+                app.wallet_address = Some(address_info.address.to_string());
+
+                // Fetch positions for the wallet address
+                if let Ok((positions, volume_data)) =
+                    fetch_positions(&address_info.address.to_string()).await
+                {
+                    app.positions = positions;
+                }
+
                 Ok(())
             }
             NetworkEvent::GetAddressPositionInfo { address, positions } => {

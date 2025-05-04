@@ -8,57 +8,76 @@ use ratatui::{
 use crate::models::event_handling::SinSignal;
 
 pub struct TokenChart {
-    pub signal: SinSignal,
     pub data: Vec<(f64, f64)>,
     pub window: [f64; 2],
+    pub max_volume: f64,
 }
 
 impl TokenChart {
     pub fn new() -> TokenChart {
-        // #TODO: Dynamically dictate signal or line depending on selected time range by tab
-        let mut signal = SinSignal::new(0.1, 2.0, 20.0);
-
-        let data = signal.by_ref().take(200).collect::<Vec<(f64, f64)>>();
-
         TokenChart {
-            signal,
-            data,
-            window: [0.0, 20.0],
+            data: Vec::new(),
+            window: [0.0, 0.0],
+            max_volume: 0.0,
         }
     }
 
-    pub fn update(&mut self) {
-        for _ in 0..10 {
-            self.data.remove(0);
+    pub fn update_with_volume_data(&mut self, volume_data: &[(f64, f64)]) {
+        self.data = volume_data.to_vec();
+
+        // Calculate window bounds
+        if !self.data.is_empty() {
+            self.window = [
+                self.data.first().map(|(x, _)| *x).unwrap_or(0.0),
+                self.data.last().map(|(x, _)| *x).unwrap_or(0.0),
+            ];
+
+            // Find max volume for y-axis scaling
+            self.max_volume = self.data.iter().map(|(_, y)| *y).fold(0.0, f64::max);
         }
-        self.data.extend(self.signal.by_ref().take(10));
-        self.window[0] += 1.0;
-        self.window[1] += 1.0;
     }
 }
 
-pub fn render_chart<'a>(token_chart: &TokenChart) -> Chart {
-    // Line Graph for selected token
-    let x_labels = vec![
-        Span::styled(
-            format!("{}", token_chart.window[0]),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(format!(
-            "{}",
-            (token_chart.window[0] + token_chart.window[1]) / 2.0
-        )),
-        Span::styled(
-            format!("{}", token_chart.window[1]),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-    ];
+pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
+    // X-axis labels (time)
+    let x_labels = if !token_chart.data.is_empty() {
+        vec![
+            Span::styled(
+                format!("{}", token_chart.window[0]),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!(
+                "{}",
+                (token_chart.window[0] + token_chart.window[1]) / 2.0
+            )),
+            Span::styled(
+                format!("{}", token_chart.window[1]),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+        ]
+    } else {
+        vec![]
+    };
+
+    // Y-axis labels (volume)
+    let y_labels = if token_chart.max_volume > 0.0 {
+        vec![
+            Span::styled("0", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(format!("{:.1}K", token_chart.max_volume / 2000.0)),
+            Span::styled(
+                format!("{:.1}K", token_chart.max_volume / 1000.0),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+        ]
+    } else {
+        vec![]
+    };
 
     // Chart data
     let dataset = vec![Dataset::default()
-        .name("data")
-        .marker(symbols::Marker::Dot)
-        .style(Style::default().fg(Color::Cyan))
+        .name("Volume")
+        .marker(symbols::Marker::Braille)
+        .style(Style::default().fg(Color::Green))
         .data(&token_chart.data)];
 
     // Chart Styling
@@ -66,9 +85,9 @@ pub fn render_chart<'a>(token_chart: &TokenChart) -> Chart {
         .block(
             Block::default()
                 .title(Span::styled(
-                    "Price",
+                    "24h Volume",
                     Style::default()
-                        .fg(Color::LightCyan)
+                        .fg(Color::LightGreen)
                         .add_modifier(Modifier::BOLD),
                 ))
                 .borders(Borders::ALL),
@@ -82,14 +101,10 @@ pub fn render_chart<'a>(token_chart: &TokenChart) -> Chart {
         )
         .y_axis(
             Axis::default()
-                .title("Price")
+                .title("Volume (USD)")
                 .style(Style::default().fg(Color::Gray))
-                .labels(vec![
-                    Span::styled("1800", Style::default().add_modifier(Modifier::BOLD)),
-                    Span::raw("0"),
-                    Span::styled("2420", Style::default().add_modifier(Modifier::BOLD)),
-                ])
-                .bounds([-20.0, 20.0]),
+                .labels(y_labels)
+                .bounds([0.0, token_chart.max_volume]),
         );
     chart
 }

@@ -14,12 +14,14 @@ cfonts = "1.2.0"
 chrono = "0.4.41"
 clap = { version = "4.5.37", features = ["derive"] }
 crossterm = "0.29.0"
-crossbeam-channel = "0.5.13"
+crossbeam-channel = "0.5.15"
 ethers = { version = "2.0.14" }
 parking_lot = "0.12.3"
 futures = "0.3.31"
 hyper = "1.6.0"
+hyper-util = "0.1.11"
 juniper = "0.16.1"
+juniper_hyper = "0.9.0"
 rand = { version = "0.9.1", default-features = false, features = ["std"] }
 ratatui = "0.29.0"
 reqwest = { version = "0.12.15", features = ["json"] }

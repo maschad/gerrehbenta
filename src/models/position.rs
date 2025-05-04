@@ -1,43 +1,7 @@
 use juniper::GraphQLObject;
+use serde::Deserialize;
 
-/** Query for active liquidity positions
- * {
-  positions(where: {owner: "0x6ed31d002338349e486dad57939e1e4a4a7a0007", liquidity_gt: 0}) {
-    token1 {
-      symbol
-      decimals
-      name
-    }
-    transaction {
-      timestamp
-    }
-    token0 {
-      symbol
-      decimals
-      name
-    }
-    pool {
-      token0Price
-      token1Price
-      volumeToken0
-      volumeToken1
-      feeGrowthGlobal0X128
-      feeGrowthGlobal1X128
-    }
-    feeGrowthInside0LastX128
-    feeGrowthInside1LastX128
-    tickLower {feeGrowthOutside0X128 feeGrowthOutside1X128} #feeGrowthOutside0X128_lower
-    tickUpper {feeGrowthOutside0X128 feeGrowthOutside1X128} #feeGrowthOutside0X128_upper
-    withdrawnToken0
-    withdrawnToken1
-    depositedToken0
-    depositedToken1
-    liquidity
-  }
-}
- */
-
-#[derive(Debug, Clone, GraphQLObject)]
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a token")]
 pub struct Token {
     /// The name of the token
@@ -48,14 +12,14 @@ pub struct Token {
     decimals: i32,
 }
 
-#[derive(Debug, Clone, GraphQLObject)]
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a transaction")]
 pub struct Transaction {
     /// The timestamp of the transaction
     timestamp: i32,
 }
 
-#[derive(Debug, Clone, GraphQLObject)]
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a Uniswap pool")]
 pub struct Pool {
     token_0_price: i32,
@@ -66,13 +30,14 @@ pub struct Pool {
     fee_growth_global_1_x128: String,
 }
 
-#[derive(Debug, Clone, GraphQLObject)]
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a Uniswap tick")]
 pub struct Tick {
     fee_growth_outside_0_x128: String,
     fee_growth_outside_1_x128: String,
 }
-#[derive(Debug, Clone, GraphQLObject)]
+
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a Uniswap position")]
 pub struct Position {
     token_0: Token,
