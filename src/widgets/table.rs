@@ -1,28 +1,66 @@
 use ratatui::{
-    layout::Constraint,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Cell, Row, Table, TableState},
+    Frame,
 };
 
-use crate::{app::App, routes::ActiveBlock};
+use crate::{
+    app::App,
+    routes::ActiveBlock,
+    widgets::chart::{render_volume_chart, TokenChart},
+};
 
-pub struct StatefulTable<'a> {
+pub struct StatefulTable {
     pub state: TableState,
-    pub items: Vec<Vec<&'a str>>,
+    pub items: Vec<Vec<String>>,
+    pub charts: Vec<TokenChart>,
 }
 
-impl<'a> StatefulTable<'a> {
-    pub fn new() -> StatefulTable<'a> {
+impl StatefulTable {
+    pub fn new() -> StatefulTable {
         StatefulTable {
             state: TableState::default(),
-            // #TODO: Pull token prices and populate here
-            items: vec![
-                vec!["USDC/ETH", "$2,400", "✓", "2d"],
-                vec!["ETH/MATIC", "$100", "X", "10d"],
-                vec!["USDC/TETH", "$2,000", "✓", "2w"],
-            ],
+            items: Vec::new(),
+            charts: Vec::new(),
         }
     }
+
+    pub fn update_positions(
+        &mut self,
+        positions: &[crate::models::position::Position],
+        volume_data: &[(f64, f64)],
+    ) {
+        self.items = positions
+            .iter()
+            .map(|pos| {
+                vec![
+                    format!("{}/{}", pos.token_0.symbol, pos.token_1.symbol),
+                    format!(
+                        "${:.2}",
+                        pos.pool.volume_token_0 as f64 * pos.pool.token_0_price as f64
+                    ),
+                    if pos.liquidity > 0 {
+                        "✓".to_string()
+                    } else {
+                        "X".to_string()
+                    },
+                    format!("{}", pos.transaction.timestamp),
+                ]
+            })
+            .collect();
+
+        // Create charts for each position
+        self.charts = positions
+            .iter()
+            .map(|_| {
+                let mut chart = TokenChart::new();
+                chart.update_with_volume_data(volume_data);
+                chart
+            })
+            .collect();
+    }
+
     pub fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
@@ -52,8 +90,19 @@ impl<'a> StatefulTable<'a> {
     }
 }
 
-pub fn render_table<'a>(table: &StatefulTable<'a>, app: &'a mut App) -> Table<'a> {
-    // Table Layout
+pub fn render_table<'a>(
+    frame: &mut Frame,
+    stateful_table: &StatefulTable,
+    app: &'a mut App,
+    area: Rect,
+) {
+    // Split the area into table and chart sections
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(10), Constraint::Min(0)])
+        .split(area);
+
+    // Render the table
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let normal_style = Style::default().bg(Color::LightBlue);
     let header_cells = ["Name", "Fees", "In-Range", "Age"]
@@ -63,18 +112,17 @@ pub fn render_table<'a>(table: &StatefulTable<'a>, app: &'a mut App) -> Table<'a
         .style(normal_style)
         .height(1)
         .bottom_margin(5);
-    let rows = table.items.iter().map(|item| {
+    let rows = stateful_table.items.iter().map(|item| {
         let height = item
             .iter()
             .map(|content| content.chars().filter(|c| *c == '\n').count())
             .max()
             .unwrap_or(0)
             + 1;
-        let cells = item.iter().map(|c| Cell::from(*c));
+        let cells = item.iter().map(|c| Cell::from(c.as_str()));
         Row::new(cells).height(height as u16).bottom_margin(1)
     });
 
-    // Stateful Table for positions
     let widths = &[
         Constraint::Percentage(20),
         Constraint::Percentage(20),
@@ -100,5 +148,13 @@ pub fn render_table<'a>(table: &StatefulTable<'a>, app: &'a mut App) -> Table<'a
                 .title("My Positions"),
         );
 
-    table
+    frame.render_stateful_widget(table, chunks[0], &mut stateful_table.state.clone());
+
+    // Render the volume chart for the selected position
+    if let Some(selected) = stateful_table.state.selected() {
+        if let Some(chart) = stateful_table.charts.get(selected) {
+            let volume_chart = render_volume_chart(chart);
+            frame.render_widget(volume_chart, chunks[1]);
+        }
+    }
 }

@@ -3,6 +3,7 @@ use std::sync::{mpsc::Receiver, Arc};
 
 use super::ethers::types::AddressInfo;
 use super::limit_orders::{fetch_limit_orders, LimitOrder};
+use crate::app::Mode;
 use crate::{
     app::App,
     models::position::Position,
@@ -61,6 +62,7 @@ impl Network {
     pub async fn handle_event(&mut self, event: NetworkEvent) -> Result<()> {
         match event {
             NetworkEvent::GetENSAddressInfo { name_or_address } => {
+                log::debug!("Handling GetENSAddressInfo event");
                 let res = match name_or_address {
                     NameOrAddress::Name(name) => {
                         Self::get_name_info(&self.etherscan_endpoint, &name).await
@@ -95,10 +97,15 @@ impl Network {
                 app.wallet_address = Some(address_info.address.to_string());
 
                 // Fetch positions for the wallet address
-                if let Ok((positions, volume_data)) =
-                    fetch_positions(&address_info.address.to_string()).await
-                {
+                let full_address = format!("{:?}", address_info.address);
+                log::debug!("Fetching positions for address: {}", full_address);
+                if let Ok((positions, volume_data)) = fetch_positions(&full_address).await {
+                    log::debug!("Successfully fetched {} positions", positions.len());
                     app.positions = positions;
+                    app.mode = Mode::MyPositions;
+                    app.change_active_block(ActiveBlock::MyPositions);
+                } else {
+                    log::error!("Failed to fetch positions");
                 }
 
                 Ok(())
