@@ -5,6 +5,7 @@ use crate::{
     app::{self, Mode},
     cleanup_terminal,
     models::states::InputMode,
+    network::network::NetworkEvent,
     routes::ActiveBlock,
     widgets::table,
 };
@@ -20,6 +21,36 @@ pub fn handle_key_bindings(
             cleanup_terminal();
             std::process::exit(0);
         }
+        (_, KeyModifiers::CONTROL, KeyCode::Char('l')) => {
+            let _ = request_redraw.try_send(());
+        }
+        (Mode::Welcome, _, key_code) => match key_code {
+            KeyCode::Char(c) => {
+                app.search_state.ens_state.add_char(c);
+                let _ = request_redraw.try_send(());
+            }
+            KeyCode::Backspace => {
+                app.search_state.ens_state.del_char();
+                let _ = request_redraw.try_send(());
+            }
+            KeyCode::Enter => {
+                app.search_state.current_search_query = app
+                    .search_state
+                    .ens_state
+                    .get_search_ens_string()
+                    .to_string();
+                app.submit_search();
+                let _ = request_redraw.try_send(());
+            }
+            KeyCode::Char('h') => {
+                app.show_help = true;
+            }
+            KeyCode::Char('q') => {
+                cleanup_terminal();
+                std::process::exit(0);
+            }
+            _ => {}
+        },
         (_, _, key_code) => match app.get_current_route().get_active_block() {
             ActiveBlock::SearchBar => match app.search_state.input_mode {
                 InputMode::Normal => match key_code {
@@ -38,6 +69,13 @@ pub fn handle_key_bindings(
                     }
                     KeyCode::Char('2') => {
                         app.change_active_block(ActiveBlock::MyPositions);
+                    }
+                    KeyCode::Char('3') => {
+                        app.mode = Mode::LimitOrders;
+                        app.change_active_block(ActiveBlock::LimitOrders);
+                        if let Some(network_txn) = &app.network_txn {
+                            let _ = network_txn.send(NetworkEvent::FetchLimitOrders);
+                        }
                     }
                     KeyCode::Esc => {
                         app.show_help = false;
@@ -84,6 +122,13 @@ pub fn handle_key_bindings(
                 KeyCode::Char('2') => {
                     app.change_active_block(ActiveBlock::MyPositions);
                 }
+                KeyCode::Char('3') => {
+                    app.mode = Mode::LimitOrders;
+                    app.change_active_block(ActiveBlock::LimitOrders);
+                    if let Some(network_txn) = &app.network_txn {
+                        let _ = network_txn.send(NetworkEvent::FetchLimitOrders);
+                    }
+                }
                 _ => {}
             },
             ActiveBlock::MyPositions => match key_code {
@@ -102,6 +147,35 @@ pub fn handle_key_bindings(
                 }
                 KeyCode::Up => {}
                 KeyCode::Down => {}
+                KeyCode::Char('1') => {
+                    app.change_active_block(ActiveBlock::Main);
+                }
+                KeyCode::Char('2') => {
+                    app.change_active_block(ActiveBlock::MyPositions);
+                }
+                KeyCode::Char('3') => {
+                    app.mode = Mode::LimitOrders;
+                    app.change_active_block(ActiveBlock::LimitOrders);
+                    if let Some(network_txn) = &app.network_txn {
+                        let _ = network_txn.send(NetworkEvent::FetchLimitOrders);
+                    }
+                }
+                _ => {}
+            },
+            ActiveBlock::LimitOrders => match key_code {
+                KeyCode::Char('q') => {
+                    cleanup_terminal();
+                    std::process::exit(0);
+                }
+                KeyCode::Char('h') => {
+                    app.show_help = true;
+                }
+                KeyCode::Char('s') => {
+                    app.change_active_block(ActiveBlock::SearchBar);
+                }
+                KeyCode::Esc => {
+                    app.show_help = false;
+                }
                 KeyCode::Char('1') => {
                     app.change_active_block(ActiveBlock::Main);
                 }

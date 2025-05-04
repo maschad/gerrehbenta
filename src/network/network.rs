@@ -2,10 +2,14 @@ use anyhow::Result;
 use std::sync::{mpsc::Receiver, Arc};
 
 use super::ethers::types::AddressInfo;
+use super::limit_orders::{fetch_limit_orders, LimitOrder};
+use crate::app::Mode;
 use crate::{
     app::App,
     models::position::Position,
+    network::server::fetch_positions,
     routes::{ActiveBlock, Route, RouteId},
+    widgets::chart::TokenChart,
 };
 use ethers::{
     core::types::{Address, NameOrAddress},
@@ -14,20 +18,14 @@ use ethers::{
 use parking_lot::{Mutex, RwLock};
 use serde::Deserialize;
 use std::convert::TryFrom;
+use std::sync::mpsc::Sender;
 
 #[derive(Deserialize, Clone, Debug)]
 pub struct Etherscan {
     api_key: Option<String>,
 }
 
-#[derive(Clone)]
-pub struct Network {
-    uniswap_v3_endpoint: String,
-    etherscan_endpoint: String,
-    uniswap_limits_endpoint: String,
-    app: Arc<Mutex<App>>,
-}
-
+#[derive(Debug)]
 pub enum NetworkEvent {
     GetENSAddressInfo {
         name_or_address: NameOrAddress,
@@ -36,6 +34,14 @@ pub enum NetworkEvent {
         address: Address,
         positions: Option<Vec<Position>>,
     },
+    FetchLimitOrders,
+}
+
+pub struct Network {
+    uniswap_v3_endpoint: String,
+    etherscan_endpoint: String,
+    uniswap_limits_endpoint: String,
+    app: Arc<Mutex<App>>,
 }
 
 impl Network {
@@ -53,9 +59,10 @@ impl Network {
         }
     }
 
-    pub async fn handle_event(&mut self, event: NetworkEvent) {
+    pub async fn handle_event(&mut self, event: NetworkEvent) -> Result<()> {
         match event {
             NetworkEvent::GetENSAddressInfo { name_or_address } => {
+                log::debug!("Handling GetENSAddressInfo event");
                 let res = match name_or_address {
                     NameOrAddress::Name(name) => {
                         Self::get_name_info(&self.etherscan_endpoint, &name).await
@@ -64,25 +71,63 @@ impl Network {
                         Self::get_address_info(&self.etherscan_endpoint, address).await
                     }
                 };
+                // Handle the result of the name or address lookup
+                let address_info = match res {
+                    Ok(Some(info)) => info,
+                    Ok(None) => {
+                        log::warn!("No address info found for the query");
+                        let mut app = self.app.lock();
+                        app.search_state.is_searching = false;
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::error!("Failed to resolve ENS or address: {}", e);
+                        let mut app = self.app.lock();
+                        app.search_state.is_searching = false;
+                        return Ok(());
+                    }
+                };
+
+                // Update app state with the resolved address
+                log::debug!("Found address info: {:?}", address_info);
                 let mut app = self.app.lock();
-                if app.search_state.is_searching {
-                    app.pop_current_route();
+
+                // Set up the UI to display the address information
+                app.search_state.is_searching = false;
+                app.wallet_address = Some(address_info.address.to_string());
+
+                // Fetch positions for the wallet address
+                let full_address = format!("{:?}", address_info.address);
+                log::debug!("Fetching positions for address: {}", full_address);
+                if let Ok((positions, volume_data)) = fetch_positions(&full_address).await {
+                    log::debug!("Successfully fetched {} positions", positions.len());
+                    app.positions = positions;
+                    app.mode = Mode::MyPositions;
+                    app.change_active_block(ActiveBlock::MyPositions);
+                } else {
+                    log::error!("Failed to fetch positions");
                 }
 
-                // if let Ok(Some(address_info)) = res {}
-                // app.set_route(Route::new(
-                //     RouteId::MyPositions(if let Ok(some) = position_res {
-                //         some
-                //     } else {
-                //         None
-                //     }),
-                //     ActiveBlock::MyPositions,
-                // ));
-
-                app.search_state.is_searching = false;
+                Ok(())
             }
             NetworkEvent::GetAddressPositionInfo { address, positions } => {
                 //#TODO Load positions
+                Ok(())
+            }
+            NetworkEvent::FetchLimitOrders => {
+                let app = self.app.clone();
+                fetch_limit_orders(app).await?;
+
+                // Schedule next update
+                let network_txn = self.app.lock().network_txn.clone();
+                if let Some(tx) = network_txn {
+                    tokio::spawn(async move {
+                        tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+                        let _ = tx.send(NetworkEvent::FetchLimitOrders);
+                    });
+                }
+
+                Ok(())
             }
         }
     }
@@ -128,7 +173,18 @@ impl Network {
 
 #[tokio::main]
 pub async fn handle_tokio(io_rx: Receiver<NetworkEvent>, network: &mut Network) {
-    while let Ok(io_event) = io_rx.recv() {
-        network.handle_event(io_event).await;
+    loop {
+        match io_rx.recv() {
+            Ok(io_event) => {
+                if let Err(e) = network.handle_event(io_event).await {
+                    log::error!("Error handling network event: {}", e);
+                }
+            }
+            Err(e) => {
+                log::error!("Network channel error: {}", e);
+                // Don't exit, just continue the loop
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+        }
     }
 }

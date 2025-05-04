@@ -2,8 +2,8 @@ use ethers::types::NameOrAddress;
 use std::sync::mpsc::Sender;
 
 use crate::{
-    models::states::AppSearchState,
-    network::network::NetworkEvent,
+    models::{position::Position, states::AppSearchState},
+    network::{limit_orders::LimitOrder, network::NetworkEvent},
     routes::{ActiveBlock, Route},
 };
 
@@ -15,17 +15,21 @@ pub struct App {
     pub previous_mode: Mode,
     /// Current input mode
     pub search_state: AppSearchState,
-    /// History of recorded messages
-    pub messages: Vec<String>,
+    /// Current wallet address
+    pub wallet_address: Option<String>,
     /// whether to show help dialogue
     pub show_help: bool,
     /// Current route
     pub routes: Vec<Route>,
     /// The channel to send network events to
     pub network_txn: Option<Sender<NetworkEvent>>,
+    /// Current limit orders
+    pub limit_orders: Vec<LimitOrder>,
+    /// Current positions
+    pub positions: Vec<Position>,
 }
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub enum Mode {
     Welcome,
     Main,
@@ -42,15 +46,21 @@ impl App {
             previous_mode: Mode::Welcome,
             mode: Mode::Welcome,
             search_state: AppSearchState::default(),
-            messages: Vec::new(),
+            wallet_address: None,
             routes: vec![Route::default()],
             show_help: false,
             network_txn: None,
+            limit_orders: Vec::new(),
+            positions: Vec::new(),
         }
     }
 
     pub fn update(&mut self) {
         // #TODO: Add update logic
+    }
+
+    pub fn update_limit_orders(&mut self, orders: Vec<LimitOrder>) {
+        self.limit_orders = orders;
     }
 
     pub fn pop_current_route(&mut self) {

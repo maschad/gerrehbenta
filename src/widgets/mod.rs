@@ -1,7 +1,10 @@
 pub mod chart;
+pub mod enter_ens;
 pub mod help;
+pub mod limit_orders;
 pub mod search;
 pub mod spinner;
 pub mod table;
 pub mod tabs;
+pub mod utils;
 pub mod welcome;
