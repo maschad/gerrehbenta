@@ -31,10 +31,15 @@ pub async fn fetch_positions(owner: &str) -> Result<(Vec<Position>, Vec<(f64, f6
                     volumeUSD
                 }}
                 pool {{
+                    id
                     token0Price
                     token1Price
-                    volumeToken0
-                    volumeToken1
+                    poolHourData(first: 24, orderBy: periodStartUnix, orderDirection: desc) {{
+                        periodStartUnix
+                        token0Price
+                        token1Price
+                        volumeUSD
+                    }}
                     poolDayData(first: 7, orderBy: date, orderDirection: desc) {{
                         date
                         token0Price

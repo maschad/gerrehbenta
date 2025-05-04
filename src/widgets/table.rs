@@ -19,8 +19,10 @@ pub struct StatefulTable {
 
 impl StatefulTable {
     pub fn new() -> StatefulTable {
+        let mut state = TableState::default();
+        state.select(Some(0));
         StatefulTable {
-            state: TableState::default(),
+            state,
             items: Vec::new(),
             charts: Vec::new(),
         }
@@ -29,7 +31,7 @@ impl StatefulTable {
     pub fn update_positions(
         &mut self,
         positions: &[crate::models::position::Position],
-        volume_data: &[(f64, f64)],
+        _volume_data: &[(f64, f64)],
     ) {
         self.items = positions
             .iter()
@@ -38,8 +40,14 @@ impl StatefulTable {
                     format!("{}/{}", pos.token0.symbol, pos.token1.symbol),
                     format!(
                         "${:.2}",
-                        pos.pool.volume_token0.parse::<f64>().unwrap_or(0.0)
-                            * pos.pool.token0_price.parse::<f64>().unwrap_or(0.0)
+                        pos.pool
+                            .pool_hour_data
+                            .iter()
+                            .last()
+                            .unwrap()
+                            .volume_usd
+                            .parse::<f64>()
+                            .unwrap_or(0.0)
                     ),
                     if pos.liquidity.parse::<f64>().unwrap_or(0.0) > 0.0 {
                         "✓".to_string()
@@ -59,9 +67,56 @@ impl StatefulTable {
         // Create charts for each position
         self.charts = positions
             .iter()
-            .map(|_| {
+            .map(|pos| {
+                let mut token0_data: Vec<(f64, f64)> = pos
+                    .pool
+                    .pool_hour_data
+                    .iter()
+                    .map(|d| {
+                        (
+                            d.period_start_unix,
+                            d.token0_price
+                                .as_ref()
+                                .unwrap_or(&String::from("0.0"))
+                                .parse::<f64>()
+                                .unwrap_or(0.0),
+                        )
+                    })
+                    .collect();
+                token0_data.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+                let mut token1_data: Vec<(f64, f64)> = pos
+                    .pool
+                    .pool_hour_data
+                    .iter()
+                    .map(|d| {
+                        (
+                            d.period_start_unix,
+                            d.token1_price
+                                .as_ref()
+                                .unwrap_or(&String::from("0.0"))
+                                .parse::<f64>()
+                                .unwrap_or(0.0),
+                        )
+                    })
+                    .collect();
+                token1_data.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+
+                // Set window using min and max
+                let window = if let (Some(min), Some(max)) = (
+                    token0_data.first().map(|x| x.0),
+                    token0_data.last().map(|x| x.0),
+                ) {
+                    [min, max]
+                } else {
+                    [0.0, 0.0]
+                };
+
                 let mut chart = TokenChart::new();
-                chart.update_with_volume_data(volume_data);
+                chart.token0_ticker = pos.token0.symbol.clone();
+                chart.token1_ticker = pos.token1.symbol.clone();
+                chart.window = window;
+                chart.update_with_price_data(&token0_data, &token1_data);
                 chart
             })
             .collect();

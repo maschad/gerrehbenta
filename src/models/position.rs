@@ -27,18 +27,28 @@ pub struct PoolDayData {
 }
 
 #[derive(Debug, Clone, GraphQLObject, Deserialize)]
+pub struct PoolHourData {
+    #[serde(rename = "periodStartUnix")]
+    pub period_start_unix: f64,
+    #[serde(rename = "token0Price")]
+    pub token0_price: Option<String>,
+    #[serde(rename = "token1Price")]
+    pub token1_price: Option<String>,
+    #[serde(rename = "volumeUSD")]
+    pub volume_usd: String,
+}
+
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a Uniswap pool")]
 pub struct Pool {
     #[serde(rename = "token0Price")]
     pub token0_price: String,
     #[serde(rename = "token1Price")]
     pub token1_price: String,
-    #[serde(rename = "volumeToken0")]
-    pub volume_token0: String,
-    #[serde(rename = "volumeToken1")]
-    pub volume_token1: String,
     #[serde(rename = "poolDayData", default)]
     pub pool_day_datas: Vec<PoolDayData>,
+    #[serde(rename = "poolHourData", default)]
+    pub pool_hour_data: Vec<PoolHourData>,
 }
 
 #[derive(Debug, Clone, GraphQLObject, Deserialize)]
