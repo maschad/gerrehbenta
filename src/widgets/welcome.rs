@@ -9,11 +9,12 @@ pub fn render_welcome<'a>(
 ) -> (
     Paragraph<'a>,
     Paragraph<'a>,
+    Paragraph<'a>,
     EnterEnsWidget,
     Rect,
     Rect,
     Rect,
-    Paragraph<'a>,
+    Rect,
 ) {
     debug!("Rendering welcome");
 
@@ -23,7 +24,8 @@ pub fn render_welcome<'a>(
             [
                 Constraint::Ratio(1, 3),
                 Constraint::Ratio(1, 3),
-                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 10),
+                Constraint::Ratio(1, 10),
             ]
             .as_ref(),
         )
@@ -32,7 +34,8 @@ pub fn render_welcome<'a>(
 
     let banner_block = chunks[0];
     let details_block = chunks[1];
-    let ens_block = chunks[2];
+    let prompt_message_block = chunks[2];
+    let ens_block = chunks[3];
 
     let banner = Paragraph::new(Text::from(
         cfonts::render(cfonts::Options {
@@ -69,10 +72,11 @@ pub fn render_welcome<'a>(
     (
         banner,
         details,
+        prompt_message,
         ens_widget,
         banner_block,
         details_block,
         ens_block,
-        prompt_message,
+        prompt_message_block,
     )
 }

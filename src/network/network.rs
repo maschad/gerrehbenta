@@ -73,44 +73,23 @@ impl Network {
                         log::warn!("No address info found for the query");
                         let mut app = self.app.lock();
                         app.search_state.is_searching = false;
-                        app.messages.push("No address found for the query".to_string());
                         return Ok(());
-                    },
+                    }
                     Err(e) => {
                         log::error!("Failed to resolve ENS or address: {}", e);
                         let mut app = self.app.lock();
                         app.search_state.is_searching = false;
-                        app.messages.push(format!("Error: {}", e));
                         return Ok(());
                     }
                 };
-                
+
                 // Update app state with the resolved address
                 log::debug!("Found address info: {:?}", address_info);
                 let mut app = self.app.lock();
-                
-                if app.search_state.is_searching {
-                    app.pop_current_route();
-                }
-                
+
                 // Set up the UI to display the address information
                 app.search_state.is_searching = false;
-                app.messages.push(format!(
-                    "Found address: {} (Balance: {} ETH){}",
-                    address_info.address,
-                    ethers::utils::format_ether(address_info.balance),
-                    address_info.ens_id.map_or("".to_string(), |ens| format!(" ENS: {}", ens))
-                ));
-                
-                // Trigger a fetch of limit orders for this address
-                if let Some(tx) = &app.network_txn {
-                    let _ = tx.send(NetworkEvent::FetchLimitOrders);
-                }
-                
-                // Switch to the LimitOrders mode to show the results
-                app.mode = crate::app::Mode::LimitOrders;
-                app.change_active_block(ActiveBlock::LimitOrders);
-                
+                app.ens_address = Some(address_info.address.to_string());
                 Ok(())
             }
             NetworkEvent::GetAddressPositionInfo { address, positions } => {
@@ -180,11 +159,11 @@ pub async fn handle_tokio(io_rx: Receiver<NetworkEvent>, network: &mut Network) 
         match io_rx.recv() {
             Ok(io_event) => {
                 if let Err(e) = network.handle_event(io_event).await {
-                    eprintln!("Error handling network event: {}", e);
+                    log::error!("Error handling network event: {}", e);
                 }
             }
             Err(e) => {
-                eprintln!("Network channel error: {}", e);
+                log::error!("Network channel error: {}", e);
                 // Don't exit, just continue the loop
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }

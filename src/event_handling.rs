@@ -34,8 +34,11 @@ pub fn handle_key_bindings(
                 let _ = request_redraw.try_send(());
             }
             KeyCode::Enter => {
-                app.search_state.current_search_query =
-                    app.search_state.ens_state.get_search_string().to_string();
+                app.search_state.current_search_query = app
+                    .search_state
+                    .ens_state
+                    .get_search_ens_string()
+                    .to_string();
                 app.submit_search();
                 let _ = request_redraw.try_send(());
             }

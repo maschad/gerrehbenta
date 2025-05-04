@@ -36,20 +36,21 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) {
                 let (
                     banner,
                     details,
+                    prompt_message,
                     ens_widget,
                     banner_block,
                     details_block,
                     ens_block,
-                    prompt_message,
+                    prompt_message_block,
                 ) = render_welcome(layout[0]);
                 frame.render_widget(banner, banner_block);
                 frame.render_widget(details, details_block);
+                frame.render_widget(prompt_message, prompt_message_block);
                 frame.render_stateful_widget(
                     ens_widget,
                     ens_block,
                     &mut app.search_state.ens_state,
                 );
-                frame.render_widget(prompt_message, layout[1]);
             }
         })
         .unwrap();

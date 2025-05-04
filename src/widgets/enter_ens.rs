@@ -7,7 +7,7 @@ use ratatui::widgets::{Paragraph, StatefulWidget, Widget, Wrap};
 use super::utils::block;
 
 pub struct EnterEnsState {
-    search_string: String,
+    search_ens_string: String,
     has_user_input: bool,
     error_msg: Option<String>,
 }
@@ -15,35 +15,35 @@ pub struct EnterEnsState {
 impl EnterEnsState {
     pub fn new() -> EnterEnsState {
         EnterEnsState {
-            search_string: String::new(),
+            search_ens_string: String::new(),
             has_user_input: false,
             error_msg: Some(String::new()),
         }
     }
 
     pub fn add_char(&mut self, c: char) {
-        self.search_string.push(c);
+        self.search_ens_string.push(c);
         self.has_user_input = true;
     }
 
     pub fn del_char(&mut self) {
-        self.search_string.pop();
+        self.search_ens_string.pop();
     }
 
     pub fn reset(&mut self) {
-        self.search_string.drain(..);
+        self.search_ens_string.drain(..);
         self.has_user_input = false;
         self.error_msg = None;
     }
 
     pub fn enter(&mut self) -> EnterEnsState {
         let mut new_state = EnterEnsState::new();
-        new_state.search_string = self.search_string.clone().to_ascii_uppercase();
+        new_state.search_ens_string = self.search_ens_string.clone().to_ascii_uppercase();
         new_state
     }
 
-    pub fn get_search_string(&self) -> &str {
-        &self.search_string
+    pub fn get_search_ens_string(&self) -> &str {
+        &self.search_ens_string
     }
 }
 
@@ -65,7 +65,7 @@ impl StatefulWidget for EnterEnsWidget {
             Line::from(vec![
                 Span::styled("> ", Style::default().fg(Color::White)),
                 Span::styled(
-                    &state.search_string,
+                    &state.search_ens_string,
                     Style::default()
                         .add_modifier(Modifier::BOLD)
                         .fg(Color::Cyan),

@@ -16,8 +16,8 @@ pub struct App {
     pub previous_mode: Mode,
     /// Current input mode
     pub search_state: AppSearchState,
-    /// History of recorded messages
-    pub messages: Vec<String>,
+    /// Current ens address
+    pub ens_address: Option<String>,
     /// whether to show help dialogue
     pub show_help: bool,
     /// Current route
@@ -45,7 +45,7 @@ impl App {
             previous_mode: Mode::Welcome,
             mode: Mode::Welcome,
             search_state: AppSearchState::default(),
-            messages: Vec::new(),
+            ens_address: None,
             routes: vec![Route::default()],
             show_help: false,
             network_txn: None,

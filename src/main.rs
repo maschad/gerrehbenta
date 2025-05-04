@@ -57,20 +57,20 @@ mod widgets;
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Etherscan Json-RPC URL
-    #[arg(short, long, default_value = "https://eth.public-rpc.com")]
+    #[arg(short, long, default_value = "https://eth.llamarpc.com/")]
     etherscan_endpoint: String,
     /// Uniswap v3 Subgraph URL
     #[arg(
-        short,
+        short = 'v',
         long,
         default_value = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3/graphql"
     )]
     uniswap_v3_endpoint: String,
     // Uniswap limits endpoint
     #[arg(
-        short,
+        short = 'l',
         long,
-        default_value = "https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3/graphql"
+        default_value = "https://api.uniswap.org/v1/limit-orders?orderStatus=open&chainId=1&limit=100&sortKey=createdAt&desc=true"
     )]
     uniswap_limits_endpoint: String,
 }
@@ -128,7 +128,8 @@ async fn main() -> Result<()> {
 
     let cloned_app = app.clone();
     let args: Args = Args::parse();
-    let (_, sync_network_rx) = mpsc::channel::<NetworkEvent>();
+    let (sync_network_tx, sync_network_rx) = mpsc::channel::<NetworkEvent>();
+    app.lock().network_txn = Some(sync_network_tx);
 
     // Start network thread
     thread::spawn(move || {
@@ -170,19 +171,11 @@ async fn main() -> Result<()> {
 fn setup_logger() {
     let _ = std::fs::create_dir("logs");
 
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            LevelFilter::Error,
-            Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Debug,
-            Config::default(),
-            std::fs::File::create(format!("logs/{}.log", Utc::now().format("%Y%m%d%H%M"))).unwrap(),
-        ),
-    ])
+    CombinedLogger::init(vec![WriteLogger::new(
+        LevelFilter::Debug,
+        Config::default(),
+        std::fs::File::create(format!("logs/{}.log", Utc::now().format("%Y%m%d%H%M"))).unwrap(),
+    )])
     .unwrap();
 }
 
