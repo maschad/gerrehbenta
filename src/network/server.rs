@@ -35,11 +35,12 @@ pub async fn fetch_positions(owner: &str) -> Result<(Vec<Position>, Vec<(f64, f6
                     token1Price
                     volumeToken0
                     volumeToken1
-                    feeGrowthGlobal0X128
-                    feeGrowthGlobal1X128
+                    poolDayData(first: 7, orderBy: date, orderDirection: desc) {{
+                        date
+                        token0Price
+                        token1Price
+                    }}
                 }}
-                feeGrowthInside0LastX128
-                feeGrowthInside1LastX128
                 tickLower {{feeGrowthOutside0X128 feeGrowthOutside1X128}}
                 tickUpper {{feeGrowthOutside0X128 feeGrowthOutside1X128}}
                 withdrawnToken0
@@ -47,6 +48,9 @@ pub async fn fetch_positions(owner: &str) -> Result<(Vec<Position>, Vec<(f64, f6
                 depositedToken0
                 depositedToken1
                 liquidity
+                transaction {{
+                    timestamp
+                }}
             }}
             tokenDayDatas(first: 24, orderBy: date, orderDirection: desc) {{
                 date

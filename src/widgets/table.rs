@@ -35,17 +35,23 @@ impl StatefulTable {
             .iter()
             .map(|pos| {
                 vec![
-                    format!("{}/{}", pos.token_0.symbol, pos.token_1.symbol),
+                    format!("{}/{}", pos.token0.symbol, pos.token1.symbol),
                     format!(
                         "${:.2}",
-                        pos.pool.volume_token_0 as f64 * pos.pool.token_0_price as f64
+                        pos.pool.volume_token0.parse::<f64>().unwrap_or(0.0)
+                            * pos.pool.token0_price.parse::<f64>().unwrap_or(0.0)
                     ),
-                    if pos.liquidity > 0 {
+                    if pos.liquidity.parse::<f64>().unwrap_or(0.0) > 0.0 {
                         "✓".to_string()
                     } else {
                         "X".to_string()
                     },
-                    format!("{}", pos.transaction.timestamp),
+                    format!(
+                        "{}",
+                        pos.transaction
+                            .as_ref()
+                            .map_or("N/A".to_string(), |t| t.timestamp.clone())
+                    ),
                 ]
             })
             .collect();

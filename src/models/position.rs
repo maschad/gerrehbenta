@@ -4,48 +4,60 @@ use serde::Deserialize;
 #[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a token")]
 pub struct Token {
-    /// The ID of the token
-    pub id: String,
     /// The name of the token
     pub name: String,
     /// The symbol of the token
     pub symbol: String,
     /// The number of decimals of the token
-    pub decimals: i32,
+    pub decimals: String,
 }
 
 #[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a transaction")]
 pub struct Transaction {
-    /// The ID of the transaction
-    pub id: String,
     /// The timestamp of the transaction
-    pub timestamp: i32,
+    pub timestamp: String,
+}
+
+#[derive(Debug, Clone, GraphQLObject, Deserialize)]
+pub struct PoolDayData {
+    pub date: f64,
+    pub token0Price: String,
+    pub token1Price: String,
 }
 
 #[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a Uniswap pool")]
 pub struct Pool {
-    /// The ID of the pool
-    pub id: String,
-    pub token_0_price: i32,
-    pub token_1_price: i32,
-    pub volume_token_0: i32,
-    pub volume_token_1: i32,
+    #[serde(rename = "token0Price")]
+    pub token0_price: String,
+    #[serde(rename = "token1Price")]
+    pub token1_price: String,
+    #[serde(rename = "volumeToken0")]
+    pub volume_token0: String,
+    #[serde(rename = "volumeToken1")]
+    pub volume_token1: String,
+    #[serde(rename = "poolDayData", default)]
+    pub pool_day_datas: Vec<PoolDayData>,
 }
 
 #[derive(Debug, Clone, GraphQLObject, Deserialize)]
 #[graphql(description = "Information about a Uniswap position")]
 pub struct Position {
-    /// The ID of the position
-    pub id: String,
-    pub token_0: Token,
-    pub token_1: Token,
+    #[serde(rename = "token0")]
+    pub token0: Token,
+    #[serde(rename = "token1")]
+    pub token1: Token,
     pub pool: Pool,
-    pub withdrawn_token_0: i32,
-    pub withdrawn_token_1: i32,
-    pub deposited_token_0: i32,
-    pub deposited_token_1: i32,
-    pub liquidity: i32,
-    pub transaction: Transaction,
+    #[serde(rename = "withdrawnToken0")]
+    pub withdrawn_token0: String,
+    #[serde(rename = "withdrawnToken1")]
+    pub withdrawn_token1: String,
+    #[serde(rename = "depositedToken0")]
+    pub deposited_token0: String,
+    #[serde(rename = "depositedToken1")]
+    pub deposited_token1: String,
+    pub liquidity: String,
+    #[serde(default)]
+    pub transaction: Option<Transaction>,
 }
