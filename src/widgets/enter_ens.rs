@@ -36,6 +36,11 @@ impl EnterEnsState {
         self.error_msg = None;
     }
 
+    pub fn set_error(&mut self, error: String) {
+        self.error_msg = Some(error);
+        self.has_user_input = false;
+    }
+
     pub fn enter(&mut self) -> EnterEnsState {
         let mut new_state = EnterEnsState::new();
         new_state.search_ens_string = self.search_ens_string.clone().to_ascii_uppercase();

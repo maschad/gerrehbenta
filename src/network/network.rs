@@ -99,16 +99,27 @@ impl Network {
                 // Fetch positions for the wallet address
                 let full_address = format!("{:?}", address_info.address);
                 log::debug!("Fetching positions for address: {}", full_address);
-                if let Ok((positions, volume_data)) = fetch_positions(&full_address).await {
-                    log::debug!("Successfully fetched {} positions", positions.len());
-                    app.positions = positions;
-                    app.mode = Mode::MyPositions;
-                    app.change_active_block(ActiveBlock::MyPositions);
-                } else {
-                    log::error!("Failed to fetch positions");
+                match fetch_positions(&full_address).await {
+                    Ok((positions, volume_data)) => {
+                        log::debug!("Successfully fetched {} positions", positions.len());
+                        app.positions = positions;
+                        app.mode = Mode::MyPositions;
+                        app.change_active_block(ActiveBlock::MyPositions);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        log::error!("Failed to fetch positions: {}", e);
+                        // If it's an API key error, propagate it up to exit the program
+                        if e.to_string().contains("SUBGRAPH_API_KEY") {
+                            Err(e)
+                        } else {
+                            // For other errors, show them in the UI
+                            app.search_state.ens_state.set_error(e.to_string());
+                            app.search_state.is_searching = false;
+                            Ok(())
+                        }
+                    }
                 }
-
-                Ok(())
             }
             NetworkEvent::GetAddressPositionInfo { address, positions } => {
                 //#TODO Load positions
@@ -172,12 +183,13 @@ impl Network {
 }
 
 #[tokio::main]
-pub async fn handle_tokio(io_rx: Receiver<NetworkEvent>, network: &mut Network) {
+pub async fn handle_tokio(io_rx: Receiver<NetworkEvent>, network: &mut Network) -> Result<()> {
     loop {
         match io_rx.recv() {
             Ok(io_event) => {
                 if let Err(e) = network.handle_event(io_event).await {
                     log::error!("Error handling network event: {}", e);
+                    return Err(e);
                 }
             }
             Err(e) => {

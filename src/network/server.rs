@@ -1,5 +1,5 @@
 use crate::models::position::Position;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::env;
 
@@ -65,7 +65,13 @@ pub async fn fetch_positions(owner: &str) -> Result<(Vec<Position>, Vec<(f64, f6
         owner_address
     );
 
-    let api_key = env::var("SUBGRAPH_API_KEY").expect("SUBGRAPH_API_KEY must be set");
+    let api_key = match env::var("SUBGRAPH_API_KEY") {
+        Ok(key) => key,
+        Err(_) => {
+            return Err(anyhow!("SUBGRAPH_API_KEY environment variable is not set. Please set it by running:\n\nexport SUBGRAPH_API_KEY=your_api_key_here\n\nYou can get an API key from https://thegraph.com/studio/apikeys/"));
+        }
+    };
+
     let client = reqwest::Client::new();
     log::debug!("Making request to Uniswap subgraph with query: {}", query);
     let mut response = match client
@@ -90,10 +96,7 @@ pub async fn fetch_positions(owner: &str) -> Result<(Vec<Position>, Vec<(f64, f6
         log::error!("Subgraph returned error status: {}", status);
         let body = response.text().await?;
         log::error!("Error response body: {}", body);
-        return Err(anyhow::anyhow!(
-            "Subgraph request failed with status {}",
-            status
-        ));
+        return Err(anyhow!("Subgraph request failed with status {}", status));
     }
 
     let response_body = response.text().await?;

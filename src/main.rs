@@ -98,9 +98,6 @@ async fn main() -> Result<()> {
     let data_received = DATA_RECEIVED.1.clone();
     let ui_events = setup_ui_events();
 
-    // let opts = OPTS.clone();
-
-    // #TODO: Store starting mode locally
     let app = Arc::new(Mutex::new(App::default()));
     let cloned_app = app.clone();
 
@@ -114,7 +111,6 @@ async fn main() -> Result<()> {
             select! {
                 recv(redraw_requested) -> _ => {
                     let mut app = app.lock();
-
                     render::draw(&mut terminal, &mut app);
                 }
                 // Default redraw on every duration
@@ -132,23 +128,26 @@ async fn main() -> Result<()> {
     app.lock().network_txn = Some(sync_network_tx);
 
     // Start network thread
-    thread::spawn(move || {
+    let network_handle = thread::spawn(move || {
         let mut network = Network::default(
             cloned_app,
             args.etherscan_endpoint,
             args.uniswap_v3_endpoint,
             args.uniswap_limits_endpoint,
         );
-        handle_tokio(sync_network_rx, &mut network);
+        if let Err(e) = handle_tokio(sync_network_rx, &mut network) {
+            if e.to_string().contains("SUBGRAPH_API_KEY") {
+                cleanup_terminal();
+                eprintln!("{}", e);
+                std::process::exit(1);
+            }
+        }
     });
 
     loop {
         select! {
-            // Notified that new data has been fetched from API, update widgets
-            // so they can update their state with this new information
             recv(data_received) -> _ => {
                 let mut app = app.lock();
-
                 app.update();
             }
             recv(ui_events) -> message => {
