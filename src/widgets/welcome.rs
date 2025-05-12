@@ -1,7 +1,7 @@
 use log::debug;
 use ratatui::{prelude::*, widgets::*};
 
-use super::enter_ens::{EnterEnsState, EnterEnsWidget};
+use super::enter_ens::{EnterENS, EnterEnsState};
 use crate::{app::App, routes::ActiveBlock};
 
 pub fn render_welcome<'a>(
@@ -10,7 +10,7 @@ pub fn render_welcome<'a>(
     Paragraph<'a>,
     Paragraph<'a>,
     Paragraph<'a>,
-    EnterEnsWidget,
+    EnterENS,
     Rect,
     Rect,
     Rect,
@@ -67,7 +67,7 @@ pub fn render_welcome<'a>(
         .alignment(Alignment::Center)
         .block(Block::default());
 
-    let ens_widget = EnterEnsWidget {};
+    let ens_widget = EnterENS {};
 
     (
         banner,

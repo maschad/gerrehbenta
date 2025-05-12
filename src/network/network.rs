@@ -83,7 +83,11 @@ impl Network {
                     Err(e) => {
                         log::error!("Failed to resolve ENS or address: {}", e);
                         let mut app = self.app.lock();
+                        app.search_state
+                            .ens_state
+                            .set_error(format!("ENS not found: {}", e));
                         app.search_state.is_searching = false;
+                        app.search_state.ens_state.is_searching = false;
                         return Ok(());
                     }
                 };

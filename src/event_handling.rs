@@ -34,13 +34,18 @@ pub fn handle_key_bindings(
                 let _ = request_redraw.try_send(());
             }
             KeyCode::Enter => {
-                app.search_state.current_search_query = app
+                let search_string = app
                     .search_state
                     .ens_state
                     .get_search_ens_string()
                     .to_string();
-                app.submit_search();
-                let _ = request_redraw.try_send(());
+                if !search_string.is_empty() {
+                    app.search_state.is_searching = true;
+                    app.search_state.ens_state.is_searching = true;
+                    app.search_state.current_search_query = search_string;
+                    app.submit_search();
+                    let _ = request_redraw.try_send(());
+                }
             }
             KeyCode::Char('h') => {
                 app.show_help = true;

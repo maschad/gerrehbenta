@@ -1,15 +1,16 @@
-use ratatui::buffer::Buffer;
-use ratatui::layout::{Alignment, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Paragraph, StatefulWidget, Widget, Wrap};
-
-use super::utils::block;
+use ratatui::{
+    buffer::Buffer,
+    layout::{Alignment, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, StatefulWidget, Widget, Wrap},
+};
 
 pub struct EnterEnsState {
     search_ens_string: String,
     has_user_input: bool,
     error_msg: Option<String>,
+    pub is_searching: bool,
 }
 
 impl EnterEnsState {
@@ -17,7 +18,8 @@ impl EnterEnsState {
         EnterEnsState {
             search_ens_string: String::new(),
             has_user_input: false,
-            error_msg: Some(String::new()),
+            error_msg: None,
+            is_searching: false,
         }
     }
 
@@ -52,34 +54,53 @@ impl EnterEnsState {
     }
 }
 
-pub struct EnterEnsWidget {}
+pub struct EnterENS {}
 
-impl StatefulWidget for EnterEnsWidget {
+impl StatefulWidget for EnterENS {
     type State = EnterEnsState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let spans = if !state.has_user_input && state.error_msg.is_some() {
-            Line::from(vec![
-                Span::styled("> ", Style::default().fg(Color::White)),
-                Span::styled(
-                    state.error_msg.as_ref().unwrap(),
-                    Style::default().add_modifier(Modifier::BOLD).fg(Color::Red),
-                ),
-            ])
+        let loading_spinner = if state.is_searching { "⏳" } else { "" };
+
+        let input_style = if state.is_searching {
+            Style::default().fg(Color::DarkGray)
+        } else if state.error_msg.is_some() {
+            Style::default().fg(Color::Red)
         } else {
-            Line::from(vec![
-                Span::styled("> ", Style::default().fg(Color::White)),
-                Span::styled(
-                    &state.search_ens_string,
-                    Style::default()
-                        .add_modifier(Modifier::BOLD)
-                        .fg(Color::Cyan),
-                ),
-            ])
+            Style::default().fg(Color::Cyan)
+        };
+
+        let spans = if !state.has_user_input && state.error_msg.is_some() {
+            Line::from(vec![Span::styled(
+                state.error_msg.as_ref().unwrap(),
+                Style::default().fg(Color::Red),
+            )])
+        } else {
+            Line::from(vec![Span::styled(
+                format!("{} {}", state.search_ens_string, loading_spinner),
+                input_style,
+            )])
+        };
+
+        let block = if state.is_searching {
+            Block::new()
+                .title(" Searching... ")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::DarkGray))
+        } else if state.error_msg.is_some() {
+            Block::new()
+                .title(" Enter ENS ")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::Red))
+        } else {
+            Block::new()
+                .title(" Enter ENS ")
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::Green))
         };
 
         Paragraph::new(spans)
-            .block(block::new(" Enter ENS "))
+            .block(block)
             .style(Style::default())
             .alignment(Alignment::Left)
             .wrap(Wrap { trim: true })
