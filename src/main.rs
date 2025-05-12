@@ -82,6 +82,9 @@ lazy_static! {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load .env file
+    dotenv::dotenv().ok();
+
     setup_panic!();
     setup_panic_hook();
     setup_terminal();
