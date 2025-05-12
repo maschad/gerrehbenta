@@ -102,7 +102,9 @@ impl Network {
                 match fetch_positions(&full_address).await {
                     Ok((positions, volume_data)) => {
                         log::debug!("Successfully fetched {} positions", positions.len());
+                        let positions_clone = positions.clone();
                         app.positions = positions;
+                        app.stateful_table.update_positions(&positions_clone, &[]);
                         app.mode = Mode::MyPositions;
                         app.change_active_block(ActiveBlock::MyPositions);
                         Ok(())

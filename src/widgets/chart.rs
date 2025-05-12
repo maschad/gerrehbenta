@@ -15,6 +15,7 @@ pub struct TokenChart {
     pub token1_ticker: String,
     pub window: [f64; 2],
     pub max_price: f64,
+    pub min_price: f64,
 }
 
 impl TokenChart {
@@ -26,6 +27,7 @@ impl TokenChart {
             token1_ticker: String::new(),
             window: [0.0, 0.0],
             max_price: 0.0,
+            min_price: 0.0,
         }
     }
 
@@ -43,18 +45,23 @@ impl TokenChart {
                 self.token0_prices.last().map(|(x, _)| *x).unwrap_or(0.0),
             ];
         }
-        // Find max price for y-axis scaling
-        let max0 = self
+        // Find min/max price for y-axis scaling
+        let all_prices = self
             .token0_prices
             .iter()
+            .chain(self.token1_prices.iter())
             .map(|(_, y)| *y)
-            .fold(0.0, f64::max);
-        let max1 = self
-            .token1_prices
-            .iter()
-            .map(|(_, y)| *y)
-            .fold(0.0, f64::max);
-        self.max_price = max0.max(max1);
+            .collect::<Vec<_>>();
+        let min_price = all_prices.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_price = all_prices.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        // If all prices are the same, add a small buffer
+        let (min_price, max_price) = if min_price == max_price {
+            (min_price * 0.95, max_price * 1.05 + 0.01)
+        } else {
+            (min_price, max_price)
+        };
+        self.max_price = max_price;
+        self.min_price = min_price;
     }
 }
 
@@ -94,12 +101,18 @@ pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
     } else {
         vec![]
     };
-    let y_labels = if token_chart.max_price > 0.0 {
+    let y_labels = if token_chart.max_price > 0.0 || token_chart.min_price < 0.0 {
+        let min = token_chart.min_price;
+        let max = token_chart.max_price;
+        let mid = (min + max) / 2.0;
         vec![
-            Span::styled("0", Style::default().add_modifier(Modifier::BOLD)),
-            Span::raw(format!("{:.1}K", token_chart.max_price / 2000.0)),
             Span::styled(
-                format!("{:.1}K", token_chart.max_price / 1000.0),
+                format!("{:.2}", min),
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!("{:.2}", mid)),
+            Span::styled(
+                format!("{:.2}", max),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
         ]
@@ -142,6 +155,6 @@ pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
                 .title("Price (USD)")
                 .style(Style::default().fg(Color::Gray))
                 .labels(y_labels)
-                .bounds([0.0, token_chart.max_price]),
+                .bounds([token_chart.min_price, token_chart.max_price]),
         )
 }

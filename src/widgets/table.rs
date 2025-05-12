@@ -11,6 +11,8 @@ use crate::{
     widgets::chart::{render_volume_chart, TokenChart},
 };
 
+use chrono::{Duration, NaiveDateTime, TimeZone, Utc};
+
 pub struct StatefulTable {
     pub state: TableState,
     pub items: Vec<Vec<String>>,
@@ -36,6 +38,25 @@ impl StatefulTable {
         self.items = positions
             .iter()
             .map(|pos| {
+                let age_str = pos.transaction.as_ref().map_or("N/A".to_string(), |t| {
+                    if let Ok(ts) = t.timestamp.parse::<i64>() {
+                        let dt = NaiveDateTime::from_timestamp_opt(ts, 0)
+                            .unwrap_or_else(|| NaiveDateTime::from_timestamp_opt(0, 0).unwrap());
+                        let now = Utc::now().naive_utc();
+                        let duration = now - dt;
+                        if duration.num_days() > 0 {
+                            format!("{}d ago", duration.num_days())
+                        } else if duration.num_hours() > 0 {
+                            format!("{}h ago", duration.num_hours())
+                        } else if duration.num_minutes() > 0 {
+                            format!("{}m ago", duration.num_minutes())
+                        } else {
+                            "just now".to_string()
+                        }
+                    } else {
+                        "N/A".to_string()
+                    }
+                });
                 vec![
                     format!("{}/{}", pos.token0.symbol, pos.token1.symbol),
                     format!(
@@ -54,12 +75,7 @@ impl StatefulTable {
                     } else {
                         "X".to_string()
                     },
-                    format!(
-                        "{}",
-                        pos.transaction
-                            .as_ref()
-                            .map_or("N/A".to_string(), |t| t.timestamp.clone())
-                    ),
+                    age_str,
                 ]
             })
             .collect();
@@ -151,69 +167,43 @@ impl StatefulTable {
     }
 }
 
-pub fn render_table<'a>(
-    frame: &mut Frame,
-    stateful_table: &StatefulTable,
-    app: &'a mut App,
-    area: Rect,
-) {
+pub fn render_table<'a>(frame: &mut Frame, table: &mut StatefulTable, area: Rect) {
     // Split the area into table and chart sections
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(10), Constraint::Min(0)])
+        .constraints([Constraint::Min(10), Constraint::Min(10)].as_ref())
         .split(area);
 
-    // Render the table
-    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default().bg(Color::LightBlue);
-    let header_cells = ["Name", "Fees", "In-Range", "Age"]
-        .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::White)));
-    let header = Row::new(header_cells)
-        .style(normal_style)
-        .height(1)
-        .bottom_margin(5);
-    let rows = stateful_table.items.iter().map(|item| {
-        let height = item
-            .iter()
-            .map(|content| content.chars().filter(|c| *c == '\n').count())
-            .max()
-            .unwrap_or(0)
-            + 1;
-        let cells = item.iter().map(|c| Cell::from(c.as_str()));
-        Row::new(cells).height(height as u16).bottom_margin(1)
-    });
+    let table_widget = Table::new(
+        table.items.iter().map(|item| {
+            let height = item
+                .iter()
+                .map(|content| content.lines().count())
+                .max()
+                .unwrap_or(1);
+            Row::new(item.clone()).height(height as u16)
+        }),
+        &[
+            Constraint::Length(20),
+            Constraint::Length(20),
+            Constraint::Length(20),
+            Constraint::Length(20),
+        ],
+    )
+    .header(
+        Row::new(vec!["Pool", "Token0", "Token1", "Value"])
+            .style(Style::default().fg(Color::Yellow))
+            .height(1)
+            .bottom_margin(5),
+    )
+    .block(Block::default().title("My Positions").borders(Borders::ALL))
+    .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
-    let widths = &[
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-    ];
-
-    let table = Table::new(rows, widths)
-        .header(header)
-        .highlight_style(selected_style)
-        .highlight_symbol(">> ")
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Thick)
-                .border_style(Style::default().fg(
-                    if let ActiveBlock::MyPositions = app.get_current_route().get_active_block() {
-                        Color::Green
-                    } else {
-                        Color::White
-                    },
-                ))
-                .title("My Positions"),
-        );
-
-    frame.render_stateful_widget(table, chunks[0], &mut stateful_table.state.clone());
+    frame.render_stateful_widget(table_widget, chunks[0], &mut table.state);
 
     // Render the volume chart for the selected position
-    if let Some(selected) = stateful_table.state.selected() {
-        if let Some(chart) = stateful_table.charts.get(selected) {
+    if let Some(selected) = table.state.selected() {
+        if let Some(chart) = table.charts.get(selected) {
             let volume_chart = render_volume_chart(chart);
             frame.render_widget(volume_chart, chunks[1]);
         }

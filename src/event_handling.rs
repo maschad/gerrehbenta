@@ -145,8 +145,14 @@ pub fn handle_key_bindings(
                 KeyCode::Esc => {
                     app.show_help = false;
                 }
-                KeyCode::Up => {}
-                KeyCode::Down => {}
+                KeyCode::Up => {
+                    app.stateful_table.previous();
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Down => {
+                    app.stateful_table.next();
+                    let _ = request_redraw.try_send(());
+                }
                 KeyCode::Char('1') => {
                     app.change_active_block(ActiveBlock::Main);
                 }

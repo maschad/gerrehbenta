@@ -5,6 +5,7 @@ use crate::{
     models::{position::Position, states::AppSearchState},
     network::{limit_orders::LimitOrder, network::NetworkEvent},
     routes::{ActiveBlock, Route},
+    widgets::table::StatefulTable,
 };
 
 // App holds the state of the application
@@ -27,6 +28,8 @@ pub struct App {
     pub limit_orders: Vec<LimitOrder>,
     /// Current positions
     pub positions: Vec<Position>,
+    /// Table state for positions
+    pub stateful_table: StatefulTable,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -52,6 +55,7 @@ impl App {
             network_txn: None,
             limit_orders: Vec::new(),
             positions: Vec::new(),
+            stateful_table: StatefulTable::new(),
         }
     }
 
