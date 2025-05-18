@@ -33,8 +33,7 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) {
             // Set background color
             frame.render_widget(Block::default(), frame.area());
 
-            let app = unsafe { &mut *(app as *mut App) };
-
+            let stateful_table = &mut app.stateful_table;
             match app.mode {
                 Mode::Welcome => {
                     let layout = Layout::default()
@@ -62,7 +61,14 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) {
                 }
                 Mode::MyPositions => {
                     debug!("Drawing My Positions");
-                    render_table(frame, &mut app.stateful_table, frame.area());
+                    render_table(
+                        frame,
+                        stateful_table,
+                        frame.area(),
+                        &app.positions,
+                        app.chart_time_range,
+                        app.chart_view,
+                    );
                 }
                 _ => {}
             }

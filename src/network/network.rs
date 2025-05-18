@@ -107,8 +107,24 @@ impl Network {
                     Ok((positions, volume_data)) => {
                         log::debug!("Successfully fetched {} positions", positions.len());
                         let positions_clone = positions.clone();
+                        // Parse tokenDayDatas for each position
+                        let token_day_datas: Vec<Vec<(f64, f64)>> = positions_clone
+                            .iter()
+                            .map(|pos| {
+                                pos.pool
+                                    .pool_day_datas
+                                    .iter()
+                                    .map(|d| {
+                                        let date = d.date;
+                                        let volume = d.token0Price.parse::<f64>().unwrap_or(0.0); // fallback: use token0Price as volume if no volume field
+                                        (date, volume)
+                                    })
+                                    .collect()
+                            })
+                            .collect();
                         app.positions = positions;
-                        app.stateful_table.update_positions(&positions_clone, &[]);
+                        app.stateful_table
+                            .update_positions(&positions_clone, &token_day_datas);
                         app.mode = Mode::MyPositions;
                         app.change_active_block(ActiveBlock::MyPositions);
                         Ok(())

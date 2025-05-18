@@ -159,17 +159,65 @@ pub fn handle_key_bindings(
                     let _ = request_redraw.try_send(());
                 }
                 KeyCode::Char('1') => {
-                    app.change_active_block(ActiveBlock::Main);
+                    app.chart_time_range = crate::app::ChartTimeRange::OneDay;
+                    let _ = request_redraw.try_send(());
                 }
                 KeyCode::Char('2') => {
-                    app.change_active_block(ActiveBlock::MyPositions);
+                    app.chart_time_range = crate::app::ChartTimeRange::OneWeek;
+                    let _ = request_redraw.try_send(());
                 }
                 KeyCode::Char('3') => {
-                    app.mode = Mode::LimitOrders;
-                    app.change_active_block(ActiveBlock::LimitOrders);
-                    if let Some(network_txn) = &app.network_txn {
-                        let _ = network_txn.send(NetworkEvent::FetchLimitOrders);
-                    }
+                    app.chart_time_range = crate::app::ChartTimeRange::OneMonth;
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Char('4') => {
+                    app.chart_time_range = crate::app::ChartTimeRange::ThreeMonths;
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Char('5') => {
+                    app.chart_time_range = crate::app::ChartTimeRange::SixMonths;
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Char('6') => {
+                    app.chart_time_range = crate::app::ChartTimeRange::OneYear;
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Char('7') => {
+                    app.chart_time_range = crate::app::ChartTimeRange::FiveYears;
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Char('v') | KeyCode::Tab => {
+                    app.chart_view = match app.chart_view {
+                        crate::app::ChartView::Price => crate::app::ChartView::Volume,
+                        crate::app::ChartView::Volume => crate::app::ChartView::Price,
+                    };
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Left => {
+                    let idx = crate::app::ChartTimeRange::ALL
+                        .iter()
+                        .position(|r| *r == app.chart_time_range)
+                        .unwrap_or(0);
+                    let new_idx = if idx == 0 {
+                        crate::app::ChartTimeRange::ALL.len() - 1
+                    } else {
+                        idx - 1
+                    };
+                    app.chart_time_range = crate::app::ChartTimeRange::ALL[new_idx];
+                    let _ = request_redraw.try_send(());
+                }
+                KeyCode::Right => {
+                    let idx = crate::app::ChartTimeRange::ALL
+                        .iter()
+                        .position(|r| *r == app.chart_time_range)
+                        .unwrap_or(0);
+                    let new_idx = if idx == crate::app::ChartTimeRange::ALL.len() - 1 {
+                        0
+                    } else {
+                        idx + 1
+                    };
+                    app.chart_time_range = crate::app::ChartTimeRange::ALL[new_idx];
+                    let _ = request_redraw.try_send(());
                 }
                 _ => {}
             },

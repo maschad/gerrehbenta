@@ -16,6 +16,7 @@ pub struct TokenChart {
     pub window: [f64; 2],
     pub max_price: f64,
     pub min_price: f64,
+    pub is_hourly: bool,
 }
 
 impl TokenChart {
@@ -28,6 +29,7 @@ impl TokenChart {
             window: [0.0, 0.0],
             max_price: 0.0,
             min_price: 0.0,
+            is_hourly: false,
         }
     }
 
@@ -70,13 +72,18 @@ pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
         let start = token_chart.window[0] as i64;
         let mid = ((token_chart.window[0] + token_chart.window[1]) / 2.0) as i64;
         let end = token_chart.window[1] as i64;
+        let fmt = if token_chart.is_hourly {
+            "%Y-%m-%d %H:%M"
+        } else {
+            "%Y-%m-%d"
+        };
         vec![
             Span::styled(
                 format!(
                     "{}",
                     Utc.timestamp_opt(start, 0)
                         .single()
-                        .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                        .map(|dt| dt.format(fmt).to_string())
                         .unwrap_or_else(|| start.to_string())
                 ),
                 Style::default().add_modifier(Modifier::BOLD),
@@ -84,7 +91,7 @@ pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
             Span::raw(
                 Utc.timestamp_opt(mid, 0)
                     .single()
-                    .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                    .map(|dt| dt.format(fmt).to_string())
                     .unwrap_or_else(|| mid.to_string()),
             ),
             Span::styled(
@@ -92,7 +99,7 @@ pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
                     "{}",
                     Utc.timestamp_opt(end, 0)
                         .single()
-                        .map(|dt| dt.format("%Y-%m-%d %H:%M").to_string())
+                        .map(|dt| dt.format(fmt).to_string())
                         .unwrap_or_else(|| end.to_string())
                 ),
                 Style::default().add_modifier(Modifier::BOLD),
@@ -129,6 +136,7 @@ pub fn render_volume_chart<'a>(token_chart: &TokenChart) -> Chart {
         Dataset::default()
             .name(token_chart.token1_ticker.as_str())
             .marker(symbols::Marker::Braille)
+            .graph_type(GraphType::Line)
             .style(Style::default().fg(Color::Yellow))
             .data(&token_chart.token1_prices),
     ];

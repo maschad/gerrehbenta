@@ -8,6 +8,46 @@ use crate::{
     widgets::table::StatefulTable,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChartTimeRange {
+    OneDay,
+    OneWeek,
+    OneMonth,
+    ThreeMonths,
+    SixMonths,
+    OneYear,
+    FiveYears,
+}
+
+impl ChartTimeRange {
+    pub const ALL: [ChartTimeRange; 7] = [
+        ChartTimeRange::OneDay,
+        ChartTimeRange::OneWeek,
+        ChartTimeRange::OneMonth,
+        ChartTimeRange::ThreeMonths,
+        ChartTimeRange::SixMonths,
+        ChartTimeRange::OneYear,
+        ChartTimeRange::FiveYears,
+    ];
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ChartTimeRange::OneDay => "1D",
+            ChartTimeRange::OneWeek => "1W",
+            ChartTimeRange::OneMonth => "1M",
+            ChartTimeRange::ThreeMonths => "3M",
+            ChartTimeRange::SixMonths => "6M",
+            ChartTimeRange::OneYear => "1Y",
+            ChartTimeRange::FiveYears => "5Y",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChartView {
+    Price,
+    Volume,
+}
+
 // App holds the state of the application
 pub struct App {
     /// Current mode
@@ -30,6 +70,8 @@ pub struct App {
     pub positions: Vec<Position>,
     /// Table state for positions
     pub stateful_table: StatefulTable,
+    pub chart_time_range: ChartTimeRange,
+    pub chart_view: ChartView,
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
@@ -56,6 +98,8 @@ impl App {
             limit_orders: Vec::new(),
             positions: Vec::new(),
             stateful_table: StatefulTable::new(),
+            chart_time_range: ChartTimeRange::OneDay,
+            chart_view: ChartView::Price,
         }
     }
 
