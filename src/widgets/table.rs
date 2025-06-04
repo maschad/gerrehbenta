@@ -69,9 +69,7 @@ impl StatefulTable {
                             .pool_hour_data
                             .iter()
                             .last()
-                            .unwrap()
-                            .volume_usd
-                            .parse::<f64>()
+                            .and_then(|d| d.volume_usd.parse::<f64>().ok())
                             .unwrap_or(0.0)
                     ),
                     if pos.liquidity.parse::<f64>().unwrap_or(0.0) > 0.0 {
