@@ -132,8 +132,10 @@ fn format_number(num: f64) -> String {
 pub async fn fetch_limit_orders(app: Arc<Mutex<App>>) -> Result<()> {
     log::debug!("Starting to fetch limit orders");
 
-    // Check if we should use mock data (for testing and development)
-    let use_mock_data = false; // TODO: Make this configurable
+    // Check if we should use mock data from environment variable
+    let use_mock_data = std::env::var("USE_MOCK_DATA")
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(false);
 
     if use_mock_data {
         log::info!("Using mock limit order data for testing");
