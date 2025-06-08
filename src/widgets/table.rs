@@ -78,6 +78,28 @@ impl StatefulTable {
                         "X".to_string()
                     },
                     age_str,
+                    {
+                        let deposited0 = pos.deposited_token0.parse::<f64>().unwrap_or(0.0);
+                        let deposited1 = pos.deposited_token1.parse::<f64>().unwrap_or(0.0);
+                        let withdrawn0 = pos.withdrawn_token0.parse::<f64>().unwrap_or(0.0);
+                        let withdrawn1 = pos.withdrawn_token1.parse::<f64>().unwrap_or(0.0);
+
+                        let last = pos.pool.pool_hour_data.last();
+                        let token0_price = last
+                            .and_then(|d| d.token0_price.as_ref())
+                            .or_else(|| Some(&pos.pool.token0_price))
+                            .and_then(|p| p.parse::<f64>().ok())
+                            .unwrap_or(0.0);
+                        let token1_price = last
+                            .and_then(|d| d.token1_price.as_ref())
+                            .or_else(|| Some(&pos.pool.token1_price))
+                            .and_then(|p| p.parse::<f64>().ok())
+                            .unwrap_or(0.0);
+
+                        let fees0 = (withdrawn0 - deposited0).max(0.0) * token0_price;
+                        let fees1 = (withdrawn1 - deposited1).max(0.0) * token1_price;
+                        format!("${:.2}", fees0 + fees1)
+                    },
                 ]
             })
             .collect();
@@ -207,10 +229,11 @@ pub fn render_table<'a>(
             Constraint::Length(20),
             Constraint::Length(20),
             Constraint::Length(20),
+            Constraint::Length(20),
         ],
     )
     .header(
-        Row::new(vec!["Pool", "Token0", "Token1", "Value"])
+        Row::new(vec!["Pool", "Token0", "Token1", "Value", "Fees"])
             .style(Style::default().fg(Color::Yellow))
             .height(1)
             .bottom_margin(5),

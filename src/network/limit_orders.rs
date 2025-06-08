@@ -132,8 +132,10 @@ fn format_number(num: f64) -> String {
 pub async fn fetch_limit_orders(app: Arc<Mutex<App>>) -> Result<()> {
     log::debug!("Starting to fetch limit orders");
 
-    // Check if we should use mock data (for testing and development)
-    let use_mock_data = true; // TODO: Make this configurable
+    // Check if we should use mock data from environment variable
+    let use_mock_data = std::env::var("USE_MOCK_DATA")
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(false);
 
     if use_mock_data {
         log::info!("Using mock limit order data for testing");
@@ -182,11 +184,24 @@ pub async fn fetch_limit_orders(app: Arc<Mutex<App>>) -> Result<()> {
         }
     };
 
+    let wallet_address = {
+        let app = app.lock();
+        app.wallet_address.clone()
+    };
+
     let mut limit_orders = Vec::new();
 
     if let Some(orders_array) = orders.get("orders").and_then(|o| o.as_array()) {
         log::debug!("Processing {} orders", orders_array.len());
         for order in orders_array {
+            if let Some(addr) = &wallet_address {
+                let maker_addr = order.get("maker").and_then(|m| m.as_str());
+                if let Some(m) = maker_addr {
+                    if m.to_lowercase() != addr.to_lowercase() {
+                        continue;
+                    }
+                }
+            }
             // Handle possible missing fields with proper error checking
             let input = match order.get("input") {
                 Some(input) => input,
