@@ -1,14 +1,11 @@
-# Gerrehbenta 🚧
+# Gerrehbenta 
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/maschad/gerrehbenta/blob/main/LICENSE)
 ![Build Status](https://github.com/maschad/gerrehbenta/actions/workflows/rust.yml/badge.svg)
 
-🚧 **This project is currently under construction!** 🚧
-
-Welcome to Gerrehbenta! This is a work in progress, and I'm actively developing and improving it. Please note that some features may be incomplete or missing, and the project might not yet be ready for production use.
 
 ## Table of Contents
-- [Gerrehbenta 🚧](#gerrehbenta-)
+- [Gerrehbenta](#gerrehbenta-)
 	- [Table of Contents](#table-of-contents)
 	- [About](#about)
 	- [Features](#features)
